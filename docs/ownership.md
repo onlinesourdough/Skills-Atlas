@@ -14,17 +14,17 @@ Record one owner for each material responsibility, data source, external
 dependency, trust boundary, and operational decision. Link to the authoritative
 contract rather than copying it into this record.
 
-| Responsibility   | Source of truth                                             | Owner              | Failure or escalation route                   |
-| ---------------- | ----------------------------------------------------------- | ------------------ | --------------------------------------------- |
-| Project outcome  | [README.md](../README.md)                                   | Project owner role | AIOS lead before a lifecycle decision         |
-| Implementation   | This repository                                             | Build maintainer   | Project owner role; review gate               |
-| Operation        | [operations.md](operations.md)                              | Receiving operator | Health failure or source warning              |
-| Recovery         | [recovery.md](recovery.md)                                  | Receiving operator | Stop, rebuild, fallback rehearsal             |
-| Bundled data     | [src/data/bundled-skills.ts](../src/data/bundled-skills.ts) | Build maintainer   | Review any content/source change              |
-| Mounted Git data | Operator-selected `SKILLS_REPO_PATH`                        | Receiving operator | Source adapter warning; use bundled fallback  |
-| Design direction | [design.md](design.md) and approved handoff                 | Project owner role | Review visual/accessibility drift             |
-| Static artifact  | `dist/static` contract and manual Pages workflow            | Build maintainer   | Rebuild; do not publish before Ship authority |
-| Public release   | Future remote, Pages environment, custom domain, and DNS    | Project owner role | AIOS lead/owner Ship gate                     |
+| Responsibility   | Source of truth                                             | Owner              | Failure or escalation route                      |
+| ---------------- | ----------------------------------------------------------- | ------------------ | ------------------------------------------------ |
+| Project outcome  | [README.md](../README.md)                                   | Project owner role | AIOS lead before a lifecycle decision            |
+| Implementation   | This repository                                             | Build maintainer   | Project owner role; review gate                  |
+| Operation        | [operations.md](operations.md)                              | Receiving operator | Health failure or source warning                 |
+| Recovery         | [recovery.md](recovery.md)                                  | Receiving operator | Stop, rebuild, fallback rehearsal                |
+| Bundled data     | [src/data/bundled-skills.ts](../src/data/bundled-skills.ts) | Build maintainer   | Review any content/source change                 |
+| Mounted Git data | Operator-selected `SKILLS_REPO_PATH`                        | Receiving operator | Source adapter warning; use bundled fallback     |
+| Design direction | [design.md](design.md) and approved handoff                 | Project owner role | Review visual/accessibility drift                |
+| Static artifact  | `dist/static` contract and manual Pages workflow            | Build maintainer   | Rebuild/review; publish only with Ship authority |
+| Public release   | Canonical remote, Pages environment, custom domain, and DNS | Project owner role | AIOS lead/owner Ship gate                        |
 
 ## Boundary
 
@@ -37,6 +37,8 @@ contract. Long-term adoption measurement is therefore pending an owner
 decision; acceptance evidence for this Build is owned by the AIOS lead's
 Review gate and recorded in [proof.md](proof.md).
 
-No canonical remote, Pages environment, deployment destination state, domain
-verification, or DNS record is owned by this Build. The workflow and CNAME are
-preparation artifacts only; activation remains a later owner-authorized Ship.
+The authorized initial Ship created the canonical public remote and active
+Pages environment recorded in [proof.md](proof.md). The Project owner role owns
+that release state, custom-domain verification, and DNS. This correction Build
+owns only the unstaged candidate and local evidence; it cannot mutate or
+replace the published state without a later owner-authorized Ship.

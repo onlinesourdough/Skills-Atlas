@@ -4,9 +4,12 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const nodePort = 4175;
-const staticPort = 4176;
+const staticRootPort = 4176;
+const staticPrefixedPort = 4177;
 const nodeBase = `http://127.0.0.1:${nodePort}`;
-const staticBase = `http://127.0.0.1:${staticPort}`;
+const staticBase = `http://127.0.0.1:${staticRootPort}`;
+const staticPrefix = "/Skills-Atlas/";
+const staticPrefixedBase = `http://127.0.0.1:${staticPrefixedPort}${staticPrefix}`;
 const root = fileURLToPath(new URL("..", import.meta.url));
 const screenshotRoot = new URL("../proof/screenshots/", import.meta.url);
 const runtimeRoot = new URL("../proof/runtime/", import.meta.url);
@@ -31,19 +34,92 @@ async function waitForUrl(url) {
 }
 
 function attachBrowserDiagnostics(page, label, origin) {
-  page.on("pageerror", () => failures.push(`${label}: uncaught page error`));
+  const diagnostics = {
+    pageErrors: 0,
+    consoleErrors: 0,
+    localRequestFailures: 0,
+    localErrorResponses: 0,
+  };
+  page.on("pageerror", () => {
+    diagnostics.pageErrors += 1;
+    failures.push(`${label}: uncaught page error`);
+  });
   page.on("console", (message) => {
-    if (message.type() === "error")
+    if (message.type() === "error") {
+      diagnostics.consoleErrors += 1;
       failures.push(`${label}: browser console error: ${message.text()}`);
+    }
   });
   page.on("requestfailed", (request) => {
-    if (request.url().startsWith(origin))
+    if (request.url().startsWith(origin)) {
+      diagnostics.localRequestFailures += 1;
       failures.push(`${label}: local asset request failed: ${request.url()}`);
+    }
   });
   page.on("response", (response) => {
-    if (response.url().startsWith(origin) && response.status() >= 400)
+    if (response.url().startsWith(origin) && response.status() >= 400) {
+      diagnostics.localErrorResponses += 1;
       failures.push(`${label}: local response ${response.status()}: ${response.url()}`);
+    }
   });
+  return diagnostics;
+}
+
+function trackStaticNetwork(page, label, baseUrl) {
+  const base = new URL(baseUrl);
+  const evidence = {
+    label,
+    baseUrl,
+    expectedPrefix: base.pathname,
+    apiRequests: [],
+    localResponses: [],
+  };
+
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (/(?:^|\/)api(?:\/|$)/u.test(url.pathname)) {
+      evidence.apiRequests.push(url.pathname);
+    }
+  });
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    if (url.origin !== base.origin) return;
+    const resourceType = response.request().resourceType();
+    const kind = url.pathname.endsWith("/favicon.svg") ? "favicon" : resourceType;
+    evidence.localResponses.push({ kind, path: url.pathname, status: response.status() });
+  });
+
+  return evidence;
+}
+
+function recordStaticNetworkEvidence(evidence, diagnostics) {
+  assert(
+    evidence.apiRequests.length === 0,
+    `${evidence.label}: static build attempted an API request`,
+  );
+  for (const kind of ["document", "script", "stylesheet", "font", "favicon"]) {
+    assert(
+      evidence.localResponses.some(
+        (response) => response.kind === kind && response.status >= 200 && response.status < 400,
+      ),
+      `${evidence.label}: no successful local ${kind} response`,
+    );
+  }
+  const assetResponses = evidence.localResponses.filter((response) =>
+    ["script", "stylesheet", "font", "favicon"].includes(response.kind),
+  );
+  assert(
+    assetResponses.every((response) => response.path.startsWith(evidence.expectedPrefix)),
+    `${evidence.label}: an asset escaped the expected ${evidence.expectedPrefix} prefix`,
+  );
+  assert(diagnostics.pageErrors === 0, `${evidence.label}: page error observed`);
+  assert(diagnostics.consoleErrors === 0, `${evidence.label}: console error observed`);
+  assert(
+    diagnostics.localRequestFailures === 0,
+    `${evidence.label}: local request failure observed`,
+  );
+  assert(diagnostics.localErrorResponses === 0, `${evidence.label}: local error response observed`);
+  observations.push({ ...evidence, diagnostics });
 }
 
 async function checkCommon(page, label) {
@@ -362,50 +438,156 @@ async function exerciseMobile(page) {
   });
 }
 
-async function exerciseStatic(page) {
-  let apiRequests = 0;
-  page.on("request", (request) => {
-    if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests += 1;
-  });
+async function exerciseStaticRoot(page, network, diagnostics) {
   await page.goto(staticBase, { waitUntil: "networkidle" });
   assert(
     await page.locator(".tour-dialog").isVisible(),
-    "static: first visit did not open onboarding",
+    "static-root: first visit did not open onboarding",
   );
   assert(
     await page.getByText("Step 1 of 5", { exact: true }).isVisible(),
-    "static: first-visit onboarding progress missing",
+    "static-root: first-visit onboarding progress missing",
   );
   await page.getByRole("button", { name: "Skip tour" }).click();
   await page.locator("#graph-title").waitFor({ state: "visible" });
-  await checkCommon(page, "static-public");
-  assert(apiRequests === 0, "static: public build attempted an API request");
+  await checkCommon(page, "static-root");
   assert(
     (await page.locator(".source-warning").count()) === 0,
-    "static: false live-source warning shown",
+    "static-root: false live-source warning shown",
   );
   assert(
     await page.getByRole("button", { name: "Public source" }).isVisible(),
-    "static: bundled source status missing",
+    "static-root: bundled source status missing",
   );
   await page.getByRole("button", { name: "Library", exact: true }).click();
   assert(
     await page.getByRole("heading", { name: "Clarify" }).isVisible(),
-    "static: Library detail missing",
+    "static-root: Library detail missing",
   );
   await page.getByRole("button", { name: "Usage", exact: true }).click();
   assert(
     await page.getByText("DEMO DATA", { exact: true }).isVisible(),
-    "static: Usage unavailable",
+    "static-root: Usage unavailable",
   );
   await page.getByRole("button", { name: "Ask the Atlas", exact: true }).click();
-  assert(await page.locator("#ask-input").isVisible(), "static: deterministic Ask unavailable");
+  assert(
+    await page.locator("#ask-input").isVisible(),
+    "static-root: deterministic Ask unavailable",
+  );
   await page.keyboard.press("Escape");
   await page.screenshot({
-    path: new URL("r2-static-public.png", screenshotRoot).pathname,
+    path: new URL("r3-static-root.png", screenshotRoot).pathname,
     fullPage: true,
   });
-  observations.push({ label: "static-public-source", apiRequests, falseWarning: false });
+  observations.push({
+    label: "static-root-journey",
+    firstVisitOnboarding: true,
+    graph: true,
+    libraryDetail: true,
+    usageDemo: true,
+    deterministicAsk: true,
+  });
+  recordStaticNetworkEvidence(network, diagnostics);
+}
+
+async function exerciseStaticPrefixed(page, network, diagnostics) {
+  await page.goto(staticPrefixedBase, { waitUntil: "networkidle" });
+  const tour = page.locator(".tour-dialog");
+  const tourVisible = await tour.isVisible();
+  assert(tourVisible, "static-prefixed: first visit did not open onboarding");
+  if (!tourVisible) {
+    recordStaticNetworkEvidence(network, diagnostics);
+    return;
+  }
+
+  const onboarding = [
+    "Keep team skills findable.",
+    "Useful instructions scatter quickly.",
+    "Good edits should not stay isolated.",
+    "Give the team a common library.",
+    "Let everyone follow the reviewed version.",
+  ];
+  for (const [index, heading] of onboarding.entries()) {
+    const step = index + 1;
+    assert(
+      await page.getByText(`Step ${step} of 5`, { exact: true }).isVisible(),
+      `static-prefixed: onboarding step ${step} progress missing`,
+    );
+    assert(
+      await page.getByRole("heading", { name: heading }).isVisible(),
+      `static-prefixed: onboarding step ${step} content missing`,
+    );
+    if (step < onboarding.length) await page.getByRole("button", { name: /Next/ }).click();
+  }
+  await page.getByRole("button", { name: /Enter the public Atlas/ }).click();
+  await page.locator("#graph-title").waitFor({ state: "visible" });
+  await checkCommon(page, "static-prefixed");
+  assert(
+    (await page.locator(".source-warning").count()) === 0,
+    "static-prefixed: false live-source warning shown",
+  );
+  assert(
+    (await page.locator(".skill-cluster").count()) === 5,
+    "static-prefixed: Graph clusters missing",
+  );
+  await page.getByRole("button", { name: /Manage skills, Govern the shelf/ }).click();
+  assert(
+    await page.getByRole("heading", { name: "Manage skills" }).isVisible(),
+    "static-prefixed: Graph selection did not update the preview",
+  );
+
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  await page.getByRole("button", { name: /Manage skills 27 demo refs/ }).click();
+  assert(
+    await page.getByRole("heading", { name: "Manage skills" }).isVisible(),
+    "static-prefixed: Library detail missing",
+  );
+  await page.getByRole("button", { name: "Edit shape" }).click();
+  assert(
+    await page.getByRole("button", { name: "Save to Git" }).isDisabled(),
+    "static-prefixed: public save action was enabled",
+  );
+  assert(
+    await page.getByText("Editing is denied in the public Atlas.").isVisible(),
+    "static-prefixed: edit denial was not visible",
+  );
+
+  await page.getByRole("button", { name: "Usage", exact: true }).click();
+  assert(
+    await page.getByText("DEMO DATA", { exact: true }).isVisible(),
+    "static-prefixed: Usage demo label missing",
+  );
+  const telemetryMetric = page
+    .locator(".usage-metrics > div")
+    .filter({ hasText: "telemetry writes" });
+  assert(
+    (await telemetryMetric.textContent())?.replace(/\s+/gu, "") === "0telemetrywrites",
+    "static-prefixed: zero-telemetry truth missing",
+  );
+
+  await page.getByRole("button", { name: "Ask the Atlas", exact: true }).click();
+  await page.locator("#ask-input").fill("What does route models do?");
+  await page.getByRole("button", { name: "Ask bundled index" }).click();
+  assert(
+    await page.getByRole("heading", { name: "Route models is a good first stop" }).isVisible(),
+    "static-prefixed: deterministic Ask answer missing",
+  );
+  await page.getByRole("button", { name: "Close Ask the Atlas" }).click();
+  await page.screenshot({
+    path: new URL("r3-static-prefixed.png", screenshotRoot).pathname,
+    fullPage: true,
+  });
+  observations.push({
+    label: "static-prefixed-journey",
+    onboardingSteps: onboarding.length,
+    graphSelection: true,
+    libraryDetail: true,
+    editDenied: true,
+    usageDemo: true,
+    zeroTelemetryLabel: true,
+    deterministicAsk: true,
+  });
+  recordStaticNetworkEvidence(network, diagnostics);
 }
 
 const nodeServer = spawn(process.execPath, ["dist/server/index.js"], {
@@ -413,7 +595,7 @@ const nodeServer = spawn(process.execPath, ["dist/server/index.js"], {
   env: { ...process.env, PORT: String(nodePort), HOST: "127.0.0.1" },
   stdio: ["ignore", "ignore", "ignore"],
 });
-const staticServer = spawn(
+const staticRootServer = spawn(
   process.execPath,
   [
     "node_modules/vite/bin/vite.js",
@@ -421,9 +603,27 @@ const staticServer = spawn(
     "--host",
     "127.0.0.1",
     "--port",
-    String(staticPort),
+    String(staticRootPort),
+    "--strictPort",
     "--outDir",
     "dist/static",
+  ],
+  { cwd: root, stdio: ["ignore", "ignore", "ignore"] },
+);
+const staticPrefixedServer = spawn(
+  process.execPath,
+  [
+    "node_modules/vite/bin/vite.js",
+    "preview",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    String(staticPrefixedPort),
+    "--strictPort",
+    "--outDir",
+    "dist/static",
+    "--base",
+    staticPrefix,
   ],
   { cwd: root, stdio: ["ignore", "ignore", "ignore"] },
 );
@@ -431,7 +631,11 @@ const staticServer = spawn(
 try {
   await mkdir(screenshotRoot, { recursive: true });
   await mkdir(runtimeRoot, { recursive: true });
-  await Promise.all([waitForUrl(`${nodeBase}/api/health`), waitForUrl(staticBase)]);
+  await Promise.all([
+    waitForUrl(`${nodeBase}/api/health`),
+    waitForUrl(staticBase),
+    waitForUrl(staticPrefixedBase),
+  ]);
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   try {
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -446,9 +650,32 @@ try {
     await mobile.close();
 
     const staticPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-    attachBrowserDiagnostics(staticPage, "static", staticBase);
-    await exerciseStatic(staticPage);
+    const staticDiagnostics = attachBrowserDiagnostics(
+      staticPage,
+      "static-root",
+      new URL(staticBase).origin,
+    );
+    const staticNetwork = trackStaticNetwork(staticPage, "static-root", staticBase);
+    await exerciseStaticRoot(staticPage, staticNetwork, staticDiagnostics);
     await staticPage.close();
+
+    const staticPrefixedPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const staticPrefixedDiagnostics = attachBrowserDiagnostics(
+      staticPrefixedPage,
+      "static-prefixed",
+      new URL(staticPrefixedBase).origin,
+    );
+    const staticPrefixedNetwork = trackStaticNetwork(
+      staticPrefixedPage,
+      "static-prefixed",
+      staticPrefixedBase,
+    );
+    await exerciseStaticPrefixed(
+      staticPrefixedPage,
+      staticPrefixedNetwork,
+      staticPrefixedDiagnostics,
+    );
+    await staticPrefixedPage.close();
   } finally {
     await browser.close();
   }
@@ -456,7 +683,8 @@ try {
   failures.push(error instanceof Error ? error.message : "browser proof failed");
 } finally {
   nodeServer.kill("SIGTERM");
-  staticServer.kill("SIGTERM");
+  staticRootServer.kill("SIGTERM");
+  staticPrefixedServer.kill("SIGTERM");
 }
 
 await writeFile(
@@ -464,7 +692,9 @@ await writeFile(
   JSON.stringify(
     {
       nodeBase,
+      staticArtifact: "dist/static",
       staticBase,
+      staticPrefixedBase,
       viewport: { desktop: "1440x1000", mobile: "390x844" },
       observations,
       failures,
@@ -479,6 +709,6 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log(
-    "PASS r2 browser proof: Node/static desktop/mobile journeys, focus, denial, and client safety",
+    "PASS r3 browser proof: Node desktop/mobile and dual-root static journeys, assets, denial, and client safety",
   );
 }

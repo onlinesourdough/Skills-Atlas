@@ -38,10 +38,43 @@ checkout, or expose `/api/health`.
 
 The prepared [Pages workflow](../.github/workflows/pages.yml) is manual-only.
 It runs the full local gate, rebuilds the static artifact, and uses GitHub's
-official Pages artifact/deploy actions. It has not been run. Creating the
-`onlinesourdough/Skills-Atlas` remote, enabling Pages, approving the workflow,
-verifying the custom domain, and changing DNS all require a later authorized
-Ship.
+official Pages artifact/deploy actions pinned to reviewed immutable commits.
+The canonical public remote is
+[`onlinesourdough/Skills-Atlas`](https://github.com/onlinesourdough/Skills-Atlas).
+Authorized [run 32969456173](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32969456173)
+completed successfully for commit
+`5bc468625703a1f87a2a3ece431645c3aab3ac0a`; GitHub deployment `6103985700`
+also reports `success`. Pages uses the workflow build type, HTTPS enforcement
+is enabled, and the platform URL is
+`https://onlinesourdough.github.io/Skills-Atlas/`.
+
+The initially deployed bundle uses `/` as its base for the prepared custom
+domain. The checked-in and deployed `CNAME` is
+`skills.onlinesourdough.com`, but the Pages API currently reports no active
+CNAME. Public DNS currently returns no CNAME, A, or AAAA record for that host.
+Consequently the live platform subpath returns HTML while its root-relative JS,
+CSS, fonts, and favicon return 404.
+
+The current unstaged correction candidate uses `./` only for static production
+mode; the Node client keeps `/`. `npm run browser:proof` serves the exact built
+`dist/static` directory at both `/` and `/Skills-Atlas/` and proves the prefixed
+five-step onboarding plus Graph → Library/edit denial → Usage → Ask journey,
+successful local assets, zero API requests, and clean browser diagnostics. The
+candidate has not been committed, pushed, or deployed; it does not change the
+live limitation yet.
+
+An authorized DNS owner must still create and verify the unresolved Simply DNS
+CNAME `skills.onlinesourdough.com` → `onlinesourdough.github.io`, then activate
+and verify the custom domain in GitHub Pages and recheck HTTPS plus Graph →
+Library → Usage → Ask. This Ship and correction Build did not change DNS.
+
+Current delivery state can be read without rebuilding:
+
+```sh
+gh run view 32969456173 --repo onlinesourdough/Skills-Atlas
+gh api repos/onlinesourdough/Skills-Atlas/pages
+gh api repos/onlinesourdough/Skills-Atlas/deployments/6103985700/statuses
+```
 
 ## Source configuration
 

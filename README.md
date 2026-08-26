@@ -13,6 +13,8 @@ The Git repository remains the source of truth. The Atlas owns the readable
 map, library, safe excerpts, deterministic search/Ask surface, and optional
 activity shape. This repository is the canonical Project home for the
 implementation, operation, proof, and recovery records.
+The public Git remote is
+[`onlinesourdough/Skills-Atlas`](https://github.com/onlinesourdough/Skills-Atlas).
 
 ## Run it
 
@@ -72,15 +74,28 @@ The public snapshot is deliberately concise and safe. Activity is demo data;
 Ask does not call a model; setup does not perform OAuth; editing, telemetry,
 provider access, and writes are not implemented.
 
-## Static public preparation
+## Static public release
 
 The checked-in manual workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml)
-builds `dist/static/` for a future authorized GitHub Pages release at
-`skills.onlinesourdough.com`; [CNAME](public/CNAME) and `.nojekyll` are included
-in that artifact. The workflow has not been run, no repository or remote has
-been created, and no deployment or DNS change is claimed. The static edition
-uses only bundled data. Mounted source reads and `/api/health` require the Node
-edition.
+builds `dist/static/` for `skills.onlinesourdough.com`; [CNAME](public/CNAME)
+and `.nojekyll` are included in that artifact. Initial release commit
+`5bc468625703a1f87a2a3ece431645c3aab3ac0a` is published on `main`, and
+[Pages run 32969456173](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32969456173)
+completed successfully for that exact commit.
+
+GitHub reports workflow-based Pages at
+`https://onlinesourdough.github.io/Skills-Atlas/`. The initially deployed
+artifact uses a root base: its HTML is public, but its root-relative assets
+return 404 at that repository subpath. As of 2026-08-26, public DNS has no
+record for `skills.onlinesourdough.com` and the Pages API has no active CNAME.
+
+The current unstaged correction candidate makes only static production mode use
+a relative base. Fresh local browser proof serves the same `dist/static`
+artifact at `/` and `/Skills-Atlas/`; both mounts load local JS, CSS, fonts, and
+favicon, and the prefixed critical journey passes. This correction has not been
+committed, pushed, or deployed, so the live limitation remains. No DNS change
+was made. The static edition uses only bundled data. Mounted source reads and
+`/api/health` require the Node edition.
 
 ## Architecture and records
 
@@ -137,5 +152,7 @@ Reviewable browser/runtime evidence is kept under the ignored `proof/`
 directories; the acceptance record in [docs/proof.md](docs/proof.md) names the
 exact run and limitations.
 
-No commit, remote, deployment, publication, OAuth grant, or provider action is
-part of this Build. See [LICENSE](LICENSE) for the project license.
+The authorized initial commit, public remote, and Pages deployment are recorded
+in [docs/proof.md](docs/proof.md). No OAuth grant, provider/model action,
+telemetry, credential, or DNS change was made. See [LICENSE](LICENSE) for the
+project license.

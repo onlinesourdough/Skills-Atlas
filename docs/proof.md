@@ -41,7 +41,8 @@ project-local gate is [review.md](review.md).
 - [x] Static Pages behavior: `npm run build:static` produced `dist/static` with
       `CNAME`, `.nojekyll`, and bundled assets. Fresh browser proof observed
       zero `/api/` requests and no false live-source warning. The manual Pages
-      workflow remains preparation only and was not run.
+      workflow was later dispatched once during the authorized Ship; its
+      delivery evidence and public-DNS limitation are recorded below.
 - [x] Documentation and security: local links, formatting, secret checks, full
       dependency audit, production dependency audit, and immutable workflow
       action validation pass. No secret marker appeared in the client DOM or
@@ -82,6 +83,76 @@ filename, and no research image, recording, or document-media file. The
 baseline scan identified four path occurrences and four reference-identifier
 occurrences; the post-redaction scans and security gate pass.
 
+## Authorized Ship evidence
+
+Delivery is PASS, recovery is PASS, and public outcome is PENDING the external
+DNS/custom-domain action described below.
+
+- Initial commit `5bc468625703a1f87a2a3ece431645c3aab3ac0a` contains the 57
+  reviewed files. Local `HEAD`, fetched `origin/main`, and GitHub API `main`
+  were identical after the normal push. The public canonical remote is
+  [`onlinesourdough/Skills-Atlas`](https://github.com/onlinesourdough/Skills-Atlas).
+- Pages was enabled with workflow build type. Manual
+  [run 32969456173](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32969456173)
+  used the exact reviewed commit and concluded `success`. Build job
+  `98179518772` passed checkout, Pages/Node setup, locked install, the full
+  project check, static build, and upload. Deploy job `98181132009` passed.
+- GitHub deployment `6103985700` and its final status `17360063634` report
+  `success` for `main` at the same commit, with environment URL
+  `https://onlinesourdough.github.io/Skills-Atlas/`. The Pages API reports
+  `build_type: workflow`, HTTPS enforced, platform HTML URL present, and no
+  active CNAME.
+- Uploaded artifact `9607183908` is named `github-pages`, is unexpired, and is
+  248651 bytes. Its downloaded `artifact.tar` SHA-256 is
+  `fa380e87d3aaff79536a9aa439aaa48f20a9cd459995ef8e97ec7e538fb4dbbc`.
+  Inspection found only the expected HTML, hashed JS/CSS, three local fonts,
+  favicon, `.nojekyll`, and exact `CNAME=skills.onlinesourdough.com`; the
+  relative-path extracted-file manifest SHA-256 is
+  `a624b162e0c148d0fa58f655b87c4c66536ce57707655c1fcfb5f58806573d72`.
+- The downloaded deployment artifact was served at its intended root and
+  exercised in real Chrome. All five onboarding pages, Graph, Library detail,
+  public edit denial, Usage demo labeling, and deterministic Ask passed. All
+  14 static requests returned 200, there were no dynamic/API requests, and the
+  console had zero warnings or errors.
+- Public reachability is incomplete rather than silently claimed. The platform
+  URL returned HTML 200, but its root-relative JS/CSS/favicon returned 404 at
+  the repository subpath; the same deployed files returned 200 under
+  `/Skills-Atlas/`. Public DNS returned no CNAME, A, or AAAA record for
+  `skills.onlinesourdough.com`, which did not resolve. The root-based artifact is intended for that
+  checked-in custom domain, so public Graph/Library/Usage/Ask remains pending
+  the owner-authorized Simply DNS and Pages custom-domain activation. No DNS
+  mutation was attempted.
+
+## Dual-root correction candidate
+
+Lead Review reproduced the initial deployment gap and this Build read the same
+failure before changing source. With the shipped root-base build mounted at
+`/Skills-Atlas/`, HTML and the prefixed JS file each returned 200, but the HTML
+requested `/assets/...`; that root request returned 404. The built HTML also
+used `/favicon.svg`, and CSS used `/fonts/...`.
+
+The narrow correction changes only Vite `static` mode from `/` to `./`; the
+regular Node client remains `/`. The corrected production output uses
+`./assets/...` and `./favicon.svg` in HTML and `../fonts/...` in CSS. No
+dependency, workflow, runtime UI, bundled data, or server behavior changed.
+
+The existing browser-proof owner now serves the exact same `dist/static`
+directory at both `/` and `/Skills-Atlas/`. Fresh real-Chrome proof observed:
+
+- root and prefixed document, JS, CSS, all three local fonts, and favicon
+  responses at 200;
+- all five onboarding pages at the prefixed mount, followed by Graph selection,
+  Library detail and public edit denial, Usage demo/zero-telemetry labeling, and
+  a deterministic Ask answer;
+- zero API requests, zero page/console errors, zero local request failures, and
+  zero local error responses at both static mounts.
+
+The structured evidence is in ignored `proof/runtime/browser-proof.json` and
+the new screenshots are `r3-static-root.png` and
+`r3-static-prefixed.png`. This is an uncommitted correction candidate only: no
+second push, workflow dispatch, Pages change, or deployment occurred, and the
+live platform URL still serves the initial broken artifact.
+
 ## Fresh browser evidence
 
 `npm run browser:proof` passed in the installed Chrome channel at 1440×1000 and
@@ -117,20 +188,31 @@ npm run docs:check                  PASS
 npm run security:check              PASS (secret/publish-safety scan + immutable action refs)
 publish-candidate redaction scan    PASS (paths, identifiers, filenames, media)
 workflow YAML/text validation       PASS (5 exact full-SHA pins + major comments)
-npm run browser:proof               PASS (Node/static desktop/mobile real-browser journeys)
+npm run browser:proof               PASS (Node desktop/mobile + static root/prefix real-browser journeys)
 npm run boot                        PASS (build/start/health/read/stop)
 npm audit --audit-level=high        PASS (0 vulnerabilities)
 npm audit --omit=dev --audit-level=high PASS (0 vulnerabilities)
+initial commit/push equality        PASS (local HEAD = origin/main = GitHub main)
+Pages run 32969456173               PASS (build + deploy success)
+deployment/artifact inspection     PASS (deployment 6103985700; artifact 9607183908)
+downloaded-artifact browser smoke  PASS (Graph/Library/Usage/Ask; 14 static 200; console clean)
+dual-root regression red            PASS (shipped base reproduced prefixed asset 404s)
+dual-root static candidate          PASS (root + /Skills-Atlas/ local artifact journeys)
+corrective release                  PENDING (candidate uncommitted and undeployed)
+public custom-domain journey       PENDING (Simply DNS absent; Pages CNAME inactive)
 ```
 
 ## Unavailable proof and measurement
 
-No live provider, private repository, OAuth grant, token, write, telemetry,
-runtime model, Git remote, commit, Pages environment, deployment, publication,
-custom-domain verification, or DNS action was available or authorized. These
-are explicit Build/Review boundaries, not claimed runtime evidence.
+No live provider, private repository, OAuth grant, token, product write,
+telemetry, runtime model, custom-domain verification, customer adoption, or
+DNS action was available or authorized. The public repository, commit, Pages
+environment, workflow, artifact, and platform deployment are now directly
+verified; a corrective deployment and usable custom-domain publication are not
+claimed.
 
-- Outcome signal: public critical-journey completion and successful local
-  health/source read during an owner-selected adoption window.
+- Outcome signal: custom-domain public critical-journey completion and
+  successful local health/source read during an owner-selected adoption
+  window.
 - Measurement owner and window: pending owner assignment; this Build enables
   no telemetry and claims no customer adoption.

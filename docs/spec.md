@@ -1,7 +1,7 @@
 # Project-local Spec
 
-Status: publish-safety documentation redaction passed project-local Review;
-awaiting lead re-review, 2026-08-26.
+Status: baseline contract fulfilled through the authorized initial Ship;
+dual-root static correction awaiting lead Review, 2026-08-26.
 
 ## Canonical evidence
 
@@ -17,9 +17,11 @@ awaiting lead re-review, 2026-08-26.
 - Source shape and distribution facts: the read-only canonical Online
   Sourdough Skills repository, whose payload is
   `skills/<slug>/SKILL.md`.
-- Repository ownership: this checkout is a fresh independent Project on
-  `main`, with an unborn HEAD and no remote. It owns implementation, local
-  operation, proof, and recovery after this handoff.
+- Repository ownership at creation: this checkout began as a fresh independent
+  Project on `main`, with an unborn HEAD and no remote. The authorized initial
+  Ship later established the canonical public remote recorded in
+  [proof.md](proof.md); this repository still owns implementation, operation,
+  proof, and recovery.
 
 ## Resolved contract
 
@@ -50,9 +52,11 @@ The smallest complete result is one responsive browser application with:
   files, with safe fallback when the configured source is absent or invalid;
 - reproducible local boot/build, health reporting, no-secret logs, docs,
   recovery, tests, and reviewable browser/runtime evidence.
-- a static public build and manual GitHub Pages workflow prepared for
-  `skills.onlinesourdough.com`, without creating a remote, publishing, or
-  changing DNS; the Node self-host path remains complete.
+- during the original Build, a static public build and manual GitHub Pages
+  workflow prepared for `skills.onlinesourdough.com`; that boundary stopped
+  before remote creation, publication, or DNS changes. The later authorized
+  initial Ship established the canonical public remote and Pages deployment;
+  DNS remains unchanged, and the Node self-host path remains complete.
 
 ## Boundaries and non-goals
 
@@ -60,11 +64,13 @@ The repository owns the UI, bundled demo data, parser, local filesystem
 adapter, HTTP health/data surface, operation docs, and proof. It consumes the
 approved design tokens/fonts and the documented canonical Skills file shape.
 
-It does not own or attempt OAuth, private repository access, writes, provider
-webhooks, telemetry ingestion, authentication, a database, a queue, runtime
-AI/model calls, a cloud service, deployment, publication, or a canonical
-remote. Manual token and GitHub App are described as future operator choices
-only; no credential path is implemented.
+The browser and Node application do not implement or attempt OAuth, private
+repository access, writes, provider integration, publication control,
+telemetry ingestion, authentication, a database, a queue, runtime AI/model
+calls, a cloud backend, or canonical-remote management. External repository,
+release, Pages, custom-domain, and DNS actions remain lifecycle/Ship-owned
+operations, not runtime responsibilities. Manual token and GitHub App are
+described as future operator choices only; no credential path is implemented.
 
 ## Interfaces and trust boundaries
 

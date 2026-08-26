@@ -43,10 +43,13 @@ checkout contains a skill outside those departments, its bounded adapter
 category is added to Graph and Library controls rather than silently omitted.
 
 Vite mode `static` is a compile-time boundary. It skips `/api/skills` entirely,
-uses the bundled snapshot as normal public behavior, and writes `dist/static`.
-The regular client writes `dist/client`, validates `/api/skills`, and safely
-falls back when the Node source is unavailable. The browser proof starts both
-artifacts and checks that the static edition performs zero API requests.
+uses the bundled snapshot as normal public behavior, writes `dist/static`, and
+uses a relative `./` asset base. The same static files therefore resolve from a
+domain root or a repository-style `/Skills-Atlas/` prefix. The regular client
+keeps the `/` base, writes `dist/client`, validates `/api/skills`, and safely
+falls back when the Node source is unavailable. The browser proof starts the
+Node artifact and mounts the exact static directory at both URL shapes while
+checking that the static edition performs zero API requests.
 
 ## Server contract
 
@@ -75,8 +78,12 @@ does not access the filesystem.
 
 The manually dispatched Pages workflow builds and uploads only `dist/static`.
 `public/CNAME` records the prepared custom domain and `.nojekyll` disables
-Jekyll processing. The workflow, remote, Pages environment, custom-domain
-verification, and DNS remain inactive until an authorized Ship.
+Jekyll processing. The authorized initial release deployed a root-base static
+artifact; its repository-subpath HTML is reachable while root-relative assets
+fail before custom-domain activation. The current uncommitted correction uses
+the relative static base described above and is locally dual-root verified, but
+has not been pushed or deployed. The public remote and Pages environment are
+active; custom-domain verification and DNS remain unchanged.
 
 ## Deliberate exclusions
 

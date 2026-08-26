@@ -46,13 +46,14 @@ the project secret scan. Refreshes must rerun tests, build, docs, security,
 and the browser proof before handoff.
 
 The prepared Pages workflow is manual-only, grants `contents: read`,
-`pages: write`, and `id-token: write`, and contains no secret input. It cannot
-publish from this unborn, remote-less repository. A future owner must review
-the immutable workflow action commits, branch/environment protections, domain
-verification, and repository visibility immediately before authorized Ship.
-`npm run security:check` rejects mutable third-party `uses:` references; each
-current full-SHA pin keeps a trailing major-tag comment for the documented
-re-resolution path.
+`pages: write`, and `id-token: write`, and contains no secret input. The
+authorized initial Ship ran it once from the public canonical repository. The
+current correction Build does not dispatch it. Before any corrective Ship, the
+owner must re-review the immutable workflow action commits,
+branch/environment protections, domain verification, repository visibility,
+and exact candidate commit. `npm run security:check` rejects mutable
+third-party `uses:` references; each current full-SHA pin keeps a trailing
+major-tag comment for the documented re-resolution path.
 
 ## Residual risk
 
