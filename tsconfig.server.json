@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "outDir": "dist",
+    "noEmit": false,
+    "types": ["node"]
+  },
+  "include": ["server", "src/types.ts", "src/domain", "src/data"]
+}
