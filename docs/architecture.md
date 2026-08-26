@@ -80,9 +80,10 @@ The manually dispatched Pages workflow builds and uploads only `dist/static`.
 `public/CNAME` records the prepared custom domain and `.nojekyll` disables
 Jekyll processing. The authorized initial release deployed a root-base static
 artifact; its repository-subpath HTML is reachable while root-relative assets
-fail before custom-domain activation. The current uncommitted correction uses
-the relative static base described above and is locally dual-root verified, but
-has not been pushed or deployed. The public remote and Pages environment are
+failed before custom-domain activation. Authorized corrective commit
+`0a57991d35fe736b3864fe3699ec5393248a03ad` now deploys the relative static base
+described above; the exact artifact is locally dual-root verified and the live
+repository-subpath journey passes. The public remote and Pages environment are
 active; custom-domain verification and DNS remain unchanged.
 
 ## Deliberate exclusions

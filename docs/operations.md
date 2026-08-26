@@ -36,44 +36,44 @@ The artifact is `dist/static/`. It contains the bundled snapshot, local fonts,
 request `/api/skills`, display a false live-source error, accept a mounted
 checkout, or expose `/api/health`.
 
-The prepared [Pages workflow](../.github/workflows/pages.yml) is manual-only.
+The [Pages workflow](../.github/workflows/pages.yml) is manual-only.
 It runs the full local gate, rebuilds the static artifact, and uses GitHub's
 official Pages artifact/deploy actions pinned to reviewed immutable commits.
 The canonical public remote is
 [`onlinesourdough/Skills-Atlas`](https://github.com/onlinesourdough/Skills-Atlas).
-Authorized [run 32969456173](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32969456173)
-completed successfully for commit
-`5bc468625703a1f87a2a3ece431645c3aab3ac0a`; GitHub deployment `6103985700`
-also reports `success`. Pages uses the workflow build type, HTTPS enforcement
-is enabled, and the platform URL is
+Initial [run 32969456173](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32969456173)
+delivered commit `5bc468625703a1f87a2a3ece431645c3aab3ac0a`. Corrective
+[run 32974304026](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32974304026)
+delivered commit `0a57991d35fe736b3864fe3699ec5393248a03ad`; build job
+`98195180614`, deploy job `98195355812`, deployment `6104798328`, and final
+status `17362227930` all report `success`. Pages uses workflow build type,
+HTTPS enforcement is enabled, and the platform URL is
 `https://onlinesourdough.github.io/Skills-Atlas/`.
 
-The initially deployed bundle uses `/` as its base for the prepared custom
-domain. The checked-in and deployed `CNAME` is
-`skills.onlinesourdough.com`, but the Pages API currently reports no active
-CNAME. Public DNS currently returns no CNAME, A, or AAAA record for that host.
-Consequently the live platform subpath returns HTML while its root-relative JS,
-CSS, fonts, and favicon return 404.
+The initial bundle used `/` as its static base, so its root-relative assets
+returned 404 at the repository subpath. The corrective release uses `./` only
+for static production mode; the Node client keeps `/`. Local proof serves the
+exact built `dist/static` directory at both `/` and `/Skills-Atlas/`. Live
+Chrome now completes the prefixed five-step onboarding plus Graph →
+Library/edit denial → Usage → Ask journey. All 14 static requests return 200,
+there are zero API requests, and browser diagnostics are clean.
 
-The current unstaged correction candidate uses `./` only for static production
-mode; the Node client keeps `/`. `npm run browser:proof` serves the exact built
-`dist/static` directory at both `/` and `/Skills-Atlas/` and proves the prefixed
-five-step onboarding plus Graph → Library/edit denial → Usage → Ask journey,
-successful local assets, zero API requests, and clean browser diagnostics. The
-candidate has not been committed, pushed, or deployed; it does not change the
-live limitation yet.
+The checked-in and deployed `CNAME` remains `skills.onlinesourdough.com`, but
+the Pages API reports `cname: null`. Public DNS returns NXDOMAIN for CNAME, A,
+and AAAA queries for that host.
 
 An authorized DNS owner must still create and verify the unresolved Simply DNS
 CNAME `skills.onlinesourdough.com` → `onlinesourdough.github.io`, then activate
 and verify the custom domain in GitHub Pages and recheck HTTPS plus Graph →
-Library → Usage → Ask. This Ship and correction Build did not change DNS.
+Library → Usage → Ask. The corrective Ship changed neither DNS nor the Pages
+custom-domain setting.
 
 Current delivery state can be read without rebuilding:
 
 ```sh
-gh run view 32969456173 --repo onlinesourdough/Skills-Atlas
+gh run view 32974304026 --repo onlinesourdough/Skills-Atlas
 gh api repos/onlinesourdough/Skills-Atlas/pages
-gh api repos/onlinesourdough/Skills-Atlas/deployments/6103985700/statuses
+gh api repos/onlinesourdough/Skills-Atlas/deployments/6104798328/statuses
 ```
 
 ## Source configuration

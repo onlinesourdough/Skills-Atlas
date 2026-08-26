@@ -11,18 +11,14 @@ secret or private repository data belongs in this record.
 Both deployable shapes are stateless apart from the Node operator's selected
 Git checkout. The last known good artifacts are `dist/static` from
 `npm run build:static` and the Node output from `npm run build`, both using the
-locked dependencies. The published reviewed baseline is commit
-`5bc468625703a1f87a2a3ece431645c3aab3ac0a` in
+locked dependencies. The published last-known-good correction is commit
+`0a57991d35fe736b3864fe3699ec5393248a03ad` in
 [`onlinesourdough/Skills-Atlas`](https://github.com/onlinesourdough/Skills-Atlas),
-delivered by successful Pages run `32969456173`. If the mounted source fails
+delivered by successful Pages run `32974304026`. Its parent
+`5bc468625703a1f87a2a3ece431645c3aab3ac0a` remains the reviewed prior revision
+for a revert/forward-correction decision. If the mounted source fails
 validation, the server automatically uses the bundled snapshot; this is the
 first Node recovery path and keeps browsing available.
-
-The current relative-base correction candidate is uncommitted and undeployed,
-so it does not replace that recovery anchor. Until a separately reviewed and
-authorized corrective release succeeds, the live Pages site remains the
-initial root-base deployment with the documented repository-subpath asset
-failure.
 
 1. Identify whether the failure is the Node artifact, the mounted checkout, or
    a source warning from `/api/health`.
@@ -42,7 +38,7 @@ Stop the static preview or disable the Pages site, run
 `npm ci && npm run check && npm run browser:proof`, rebuild `dist/static`, and
 verify first-visit onboarding plus Graph → Library → Usage → Ask locally.
 
-## GitHub Pages correction and disable path
+## GitHub Pages recovery and disable path
 
 Never force-push or delete the public repository. For a bad release:
 
@@ -83,10 +79,11 @@ change them.
   configuration restored `fallback: false` health and the public route.
   Invalid/empty/oversized/symlinked source cases remain covered by
   `server/source.test.ts`.
-- Pages recovery review: corrective/revert commit plus a normal push and one
-  workflow rerun is available; Pages can be disabled without deleting the
-  public repository. No destructive rollback was needed during the successful
-  initial deployment.
+- Pages recovery result: the reviewed forward-corrective path was exercised by
+  one normal push and one successful workflow dispatch. A reviewed revert or
+  later forward correction remains available, and Pages can be disabled
+  without deleting the public repository. No rollback or disable action was
+  needed.
 - Remaining risk: the mounted Git checkout's own backup, commit policy, and
   signature verification remain operator responsibilities. Public outcome
   remains pending Simply DNS and GitHub custom-domain activation.

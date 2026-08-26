@@ -37,8 +37,8 @@ contract. Long-term adoption measurement is therefore pending an owner
 decision; acceptance evidence for this Build is owned by the AIOS lead's
 Review gate and recorded in [proof.md](proof.md).
 
-The authorized initial Ship created the canonical public remote and active
-Pages environment recorded in [proof.md](proof.md). The Project owner role owns
-that release state, custom-domain verification, and DNS. This correction Build
-owns only the unstaged candidate and local evidence; it cannot mutate or
-replace the published state without a later owner-authorized Ship.
+The authorized initial and corrective Ships established the canonical public
+remote and current Pages release recorded in [proof.md](proof.md). The Project
+owner role owns that release state, custom-domain verification, and DNS. The
+current post-Ship record edits are an unstaged evidence handoff only; they do
+not mutate the published release without a later owner-authorized Ship.

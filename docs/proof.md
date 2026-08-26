@@ -83,7 +83,7 @@ filename, and no research image, recording, or document-media file. The
 baseline scan identified four path occurrences and four reference-identifier
 occurrences; the post-redaction scans and security gate pass.
 
-## Authorized Ship evidence
+## Initial Ship evidence
 
 Delivery is PASS, recovery is PASS, and public outcome is PENDING the external
 DNS/custom-domain action described below.
@@ -118,12 +118,12 @@ DNS/custom-domain action described below.
   URL returned HTML 200, but its root-relative JS/CSS/favicon returned 404 at
   the repository subpath; the same deployed files returned 200 under
   `/Skills-Atlas/`. Public DNS returned no CNAME, A, or AAAA record for
-  `skills.onlinesourdough.com`, which did not resolve. The root-based artifact is intended for that
-  checked-in custom domain, so public Graph/Library/Usage/Ask remains pending
-  the owner-authorized Simply DNS and Pages custom-domain activation. No DNS
-  mutation was attempted.
+  `skills.onlinesourdough.com`, which did not resolve. The root-based artifact
+  is intended for that checked-in custom domain, so public
+  Graph/Library/Usage/Ask remained pending the owner-authorized Simply DNS and
+  Pages custom-domain activation. No DNS mutation was attempted.
 
-## Dual-root correction candidate
+## Dual-root correction and corrective Ship
 
 Lead Review reproduced the initial deployment gap and this Build read the same
 failure before changing source. With the shipped root-base build mounted at
@@ -147,11 +147,53 @@ directory at both `/` and `/Skills-Atlas/`. Fresh real-Chrome proof observed:
 - zero API requests, zero page/console errors, zero local request failures, and
   zero local error responses at both static mounts.
 
-The structured evidence is in ignored `proof/runtime/browser-proof.json` and
-the new screenshots are `r3-static-root.png` and
-`r3-static-prefixed.png`. This is an uncommitted correction candidate only: no
-second push, workflow dispatch, Pages change, or deployment occurred, and the
-live platform URL still serves the initial broken artifact.
+Before Ship, the structured evidence was retained in ignored
+`proof/runtime/browser-proof.json`; screenshots were `r3-static-root.png` and
+`r3-static-prefixed.png`. Lead Review and publish-safety both passed for the
+exact 12-file binary diff SHA-256
+`4ea186efdcf1773620f843196e3de43824c9e04739e4a6efb84bfc092e198706`.
+
+Corrective Delivery is PASS, Recovery is PASS, and Outcome is PENDING later
+custom-domain/adoption measurement:
+
+- Corrective commit `0a57991d35fe736b3864fe3699ec5393248a03ad` has parent
+  `5bc468625703a1f87a2a3ece431645c3aab3ac0a`; its commit diff reproduces the
+  frozen SHA-256 above. One normal push updated `main`. Local `HEAD`, fetched
+  `origin/main`, `FETCH_HEAD`, and GitHub API `main` all equal the corrective
+  commit.
+- Exactly one corrective workflow dispatch created successful
+  [run 32974304026](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32974304026)
+  for that commit. Build job `98195180614` and deploy job `98195355812`
+  concluded `success`. The only other Pages run remains the initial release
+  run `32969456173`.
+- GitHub deployment `6104798328` targets `main` at the corrective commit; final
+  status `17362227930` is `success` with environment URL
+  `https://onlinesourdough.github.io/Skills-Atlas/`.
+- Artifact `9608834607` is the run's sole unexpired `github-pages` artifact,
+  248650 bytes, with API digest
+  `sha256:9c9cd0a2139299075c4ebd40a7426bf4f415468e0a67beb3fa73deea764bae7d`.
+  Downloaded `artifact.tar` is 440320 bytes with SHA-256
+  `0c2417a63dbb32d58dcd8673e9f23475fb2a69aee1093f516301fbbc2a397cc6`;
+  its relative-path file-hash manifest SHA-256 is
+  `cfb55d1c1356154d0b769f3491913f6058ac169c7c2ddd5fc2a469e0080e263d`.
+  Inspection found only HTML, hashed JS/CSS, three local fonts, favicon,
+  `.nojekyll`, and exact `CNAME=skills.onlinesourdough.com`. HTML uses
+  `./assets/...` and `./favicon.svg`; CSS uses `../fonts/...`; a bounded
+  publish-safety scan found no marker.
+- A fresh first-visit real-Chrome session at the live repository URL completed
+  all five onboarding pages, Graph selection, Library detail and disabled-save
+  denial, Usage `DEMO DATA`/zero-telemetry truth, and the deterministic Route
+  Models answer. Chrome recorded 14 static requests, all 200, no dynamic/API
+  requests, no page/request failures, and zero console warnings or errors. The
+  final viewport screenshot SHA-256 is
+  `aa29c314636a60b58911d1a25f5b918ae7b5ab82bc2d0ce281eb1e01b40dc574`.
+- The Pages API still reports `build_type: workflow`, HTTPS enforced, and
+  `cname: null`. Public CNAME, A, and AAAA lookups for
+  `skills.onlinesourdough.com` return NXDOMAIN. No DNS or Pages custom-domain
+  mutation occurred.
+- GitHub emitted one non-failing annotation: several official pinned actions'
+  Node 20 internals were forced to Node 24. The run succeeded; action-pin
+  refresh remains a later reviewed change rather than an in-Ship mutation.
 
 ## Fresh browser evidence
 
@@ -173,7 +215,8 @@ The structured result is `proof/runtime/browser-proof.json` with an empty
   `r2-desktop-setup.png`;
 - `r2-mobile-tour.png`, `r2-mobile-graph.png`, and
   `r2-mobile-library-edit.png`;
-- `r2-static-public.png` for the bundled Pages-shaped artifact.
+- `r3-static-root.png` and `r3-static-prefixed.png` for the exact dual-root
+  static artifact. `r2-static-public.png` is retained as prior evidence.
 
 Only `r2-desktop-graph.png` and `r2-mobile-library-edit.png` were loaded for the
 minimal visual spot-check. The research reference images remain external
@@ -197,8 +240,12 @@ Pages run 32969456173               PASS (build + deploy success)
 deployment/artifact inspection     PASS (deployment 6103985700; artifact 9607183908)
 downloaded-artifact browser smoke  PASS (Graph/Library/Usage/Ask; 14 static 200; console clean)
 dual-root regression red            PASS (shipped base reproduced prefixed asset 404s)
-dual-root static candidate          PASS (root + /Skills-Atlas/ local artifact journeys)
-corrective release                  PENDING (candidate uncommitted and undeployed)
+dual-root static artifact           PASS (root + /Skills-Atlas/ local artifact journeys)
+corrective commit/push equality     PASS (0a57991; local = fetched remote = GitHub main)
+corrective Pages run 32974304026    PASS (build 98195180614 + deploy 98195355812)
+corrective deployment/artifact      PASS (6104798328 / 17362227930 / 9608834607)
+live repository Chrome journey      PASS (5-step + Graph/Library/Usage/Ask; 14 static 200)
+corrective recovery                 PASS (forward path exercised; revert/disable remains available)
 public custom-domain journey       PENDING (Simply DNS absent; Pages CNAME inactive)
 ```
 
@@ -208,8 +255,8 @@ No live provider, private repository, OAuth grant, token, product write,
 telemetry, runtime model, custom-domain verification, customer adoption, or
 DNS action was available or authorized. The public repository, commit, Pages
 environment, workflow, artifact, and platform deployment are now directly
-verified; a corrective deployment and usable custom-domain publication are not
-claimed.
+verified, including the corrective live repository-subpath journey. Usable
+custom-domain publication and customer adoption are not claimed.
 
 - Outcome signal: custom-domain public critical-journey completion and
   successful local health/source read during an owner-selected adoption

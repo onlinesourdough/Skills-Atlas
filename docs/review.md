@@ -1,6 +1,7 @@
 # Project Review
 
-Result: PASS · dual-root static correction candidate · 2026-08-26
+Result: PASS · reviewed dual-root correction delivered · post-Ship records
+awaiting lead Review · 2026-08-26
 
 ## Scope and comparison point
 
@@ -15,6 +16,11 @@ operation, proof, and recovery.
 The repository remains one independently owned, stateless Project. This
 revision made no staged change, commit, push, workflow dispatch, Pages-setting
 change, deployment, DNS change, credential action, or other external mutation.
+That sentence records the pre-Ship Review boundary. The subsequent lead and
+publish-safety gates passed and authorized corrective Ship r10: commit
+`0a57991d35fe736b3864fe3699ec5393248a03ad`, one normal push, and one successful
+Pages run `32974304026`. The post-Ship factual edits in this record remain
+unstaged and await lead Review.
 
 ## Findings
 
@@ -38,8 +44,8 @@ redaction—remain closed and unchanged.
 Review also found pre-Ship state language left in security, ownership, and the
 Spec after the deliberately four-file post-Ship documentation handoff. Those
 records now distinguish the historical creation boundary, authorized initial
-release, and current unshipped correction without changing responsibility or
-authority.
+release, and the correction state at Review time without changing
+responsibility or authority.
 
 Lead revision r9 found one remaining Required documentation-truth
 contradiction: the Spec still presented its original no-remote/no-publication
@@ -68,30 +74,34 @@ closed before retaining project-local PASS.
   Full and production dependency audits report zero vulnerabilities.
 - Documentation/security: PASS. README, operations, proof, recovery,
   architecture, technology, security, ownership, Spec, and this review
-  distinguish the initial live limitation from the uncommitted correction.
-  Local links and the secret/publish-safety/immutable-action scan pass.
+  distinguish the initial live limitation, reviewed correction, and authorized
+  corrective delivery. Local links and the
+  secret/publish-safety/immutable-action scan pass.
 - Simplicity/architecture/technology: PASS. One mode-dependent Vite base and
   one extended existing proof runner solve the gap without a framework,
   dependency, workflow branch, provider, or runtime compatibility layer. The
   same built files are tested twice rather than producing host-specific
   artifacts.
-- Operation/recovery: PASS. The initial commit remains the published recovery
-  anchor. A correction requires a separately reviewed normal commit/push and
-  one authorized Pages rerun; Pages can still be disabled without repository
-  deletion. No rollback or external recovery action was needed in Build.
+- Operation/recovery: PASS. The reviewed forward-corrective path was exercised
+  by one normal push and one successful Pages dispatch. The initial commit is
+  the corrective commit's reviewed parent; a reviewed revert/forward fix and
+  Pages disable without repository deletion remain available. No rollback was
+  needed.
 
 ## Evidence and limitations
 
 Fresh structured evidence is `proof/runtime/browser-proof.json`; ignored
 screenshots include `r3-static-root.png` and `r3-static-prefixed.png`. The
-corrected artifact is locally proven only. The public Pages URL still serves
-the initial root-base artifact, custom-domain DNS remains absent, and no live
-corrective deployment or custom-domain journey is claimed.
+corrected artifact is locally and live proven at the repository subpath. Run
+`32974304026`, deployment `6104798328`, status `17362227930`, artifact
+`9608834607`, and the live Chrome journey all bind to the corrective commit.
+Custom-domain DNS remains absent, and no custom-domain journey is claimed.
 
 No live provider/private-source behavior, write path, telemetry, adoption
-window, runtime model, corrective workflow run, Pages mutation, custom-domain
-verification, or DNS action was available or authorized.
+window, runtime model, custom-domain verification, or DNS action was available
+or authorized.
 
-**PASS** — smallest next action: AIOS lead Review and publish-safety review of
-this exact unstaged correction candidate. Corrective Ship remains paused until
-authority is explicitly reissued.
+**PASS** — reviewed source delivery, recovery, and live repository journey are
+verified. Smallest next action: AIOS lead Review of the exact unstaged
+post-Ship records. No further push, workflow run, Pages change, or DNS action
+is authorized.

@@ -48,12 +48,16 @@ and the browser proof before handoff.
 The prepared Pages workflow is manual-only, grants `contents: read`,
 `pages: write`, and `id-token: write`, and contains no secret input. The
 authorized initial Ship ran it once from the public canonical repository. The
-current correction Build does not dispatch it. Before any corrective Ship, the
-owner must re-review the immutable workflow action commits,
-branch/environment protections, domain verification, repository visibility,
-and exact candidate commit. `npm run security:check` rejects mutable
-third-party `uses:` references; each current full-SHA pin keeps a trailing
-major-tag comment for the documented re-resolution path.
+authorized corrective Ship ran it once more for commit
+`0a57991d35fe736b3864fe3699ec5393248a03ad`. Before any later Ship, the owner
+must re-review the immutable workflow action commits, branch/environment
+protections, domain verification, repository visibility, and exact candidate
+commit. `npm run security:check` rejects mutable third-party `uses:`
+references; each current full-SHA pin keeps a trailing major-tag comment for
+the documented re-resolution path. The corrective run succeeded with a
+non-failing GitHub annotation that several pinned actions' Node 20 internals
+were forced to Node 24; a future action-pin refresh remains a separately
+reviewed change.
 
 ## Residual risk
 

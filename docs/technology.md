@@ -28,16 +28,16 @@ file is the reproducible handoff boundary. No pricing or plan limit applies to
 the selected runtime because it is self-hosted and provider-free.
 
 GitHub's official Pages documentation records the custom-domain and Actions
-deployment model used for preparation:
+deployment model used for delivery:
 
 - [Using custom domains with GitHub Pages](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site)
 - [Deploying with a custom GitHub Actions workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
 - [GitHub Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)
 
 The public artifact is far below documented Pages size/build limits and has no
-server-side capability. The authorized initial Pages deployment and current
-uncommitted relative-base correction do not add a provider dependency; Pages
-remains replaceable with any static host. The workflow uses the official
+server-side capability. The authorized initial and corrective Pages
+deployments do not add a provider dependency; Pages remains replaceable with
+any static host. The workflow uses the official
 checkout, setup-node, configure-pages,
 upload-pages-artifact, and deploy-pages actions pinned to full commit SHAs.
 Each pin was resolved from its official current major tag and verified against
@@ -46,8 +46,8 @@ one, resolve that major tag again through the GitHub API, inspect the resulting
 commit, replace the SHA while retaining the major-tag comment, and rerun the
 security, workflow, project, audit, and browser gates. No paid plan or provider
 credential is required. The initial authorized Pages action is recorded in
-[proof.md](proof.md); no corrective workflow or domain action occurred in this
-revision.
+[proof.md](proof.md); corrective run `32974304026` delivered the relative-base
+artifact without a domain or DNS action.
 
 ## Verification and failure behavior
 

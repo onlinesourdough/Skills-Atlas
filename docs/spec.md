@@ -1,7 +1,7 @@
 # Project-local Spec
 
-Status: baseline contract fulfilled through the authorized initial Ship;
-dual-root static correction awaiting lead Review, 2026-08-26.
+Status: baseline contract fulfilled through the authorized initial and
+corrective Ships; post-Ship evidence records awaiting lead Review, 2026-08-26.
 
 ## Canonical evidence
 
@@ -55,7 +55,8 @@ The smallest complete result is one responsive browser application with:
 - during the original Build, a static public build and manual GitHub Pages
   workflow prepared for `skills.onlinesourdough.com`; that boundary stopped
   before remote creation, publication, or DNS changes. The later authorized
-  initial Ship established the canonical public remote and Pages deployment;
+  initial Ship established the canonical public remote and Pages deployment.
+  The authorized corrective Ship then delivered the dual-root static artifact;
   DNS remains unchanged, and the Node self-host path remains complete.
 
 ## Boundaries and non-goals
@@ -100,7 +101,8 @@ described as future operator choices only; no credential path is implemented.
 ## Evidence state and residual risk
 
 - RESOLVED: intended change, served party, result boundary, canonical source,
-  repository ownership, security posture, and Build/Review-only authority.
+  repository ownership, security posture, lifecycle authority, and external
+  Ship ownership.
 - INFERRED: Node 20+ is the supported runtime, local filesystem mounting is
   the least-privilege adapter, and the public bundled snapshot is safe to
   distribute. These are reversible technical choices within Build authority.

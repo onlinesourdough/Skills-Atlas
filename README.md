@@ -84,18 +84,19 @@ and `.nojekyll` are included in that artifact. Initial release commit
 completed successfully for that exact commit.
 
 GitHub reports workflow-based Pages at
-`https://onlinesourdough.github.io/Skills-Atlas/`. The initially deployed
-artifact uses a root base: its HTML is public, but its root-relative assets
-return 404 at that repository subpath. As of 2026-08-26, public DNS has no
-record for `skills.onlinesourdough.com` and the Pages API has no active CNAME.
+`https://onlinesourdough.github.io/Skills-Atlas/`. The initial root-base
+artifact left assets unavailable at that repository subpath. Corrective commit
+`0a57991d35fe736b3864fe3699ec5393248a03ad`, delivered by successful
+[Pages run 32974304026](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32974304026),
+makes only static production mode use a relative base. The live repository URL
+now completes all five onboarding steps plus Graph, Library/edit denial, Usage,
+and deterministic Ask; its HTML, JS, CSS, three fonts, and favicon return 200
+with no API requests or browser failures.
 
-The current unstaged correction candidate makes only static production mode use
-a relative base. Fresh local browser proof serves the same `dist/static`
-artifact at `/` and `/Skills-Atlas/`; both mounts load local JS, CSS, fonts, and
-favicon, and the prefixed critical journey passes. This correction has not been
-committed, pushed, or deployed, so the live limitation remains. No DNS change
-was made. The static edition uses only bundled data. Mounted source reads and
-`/api/health` require the Node edition.
+As of 2026-08-26, public DNS still has no record for
+`skills.onlinesourdough.com` and the Pages API reports `cname: null`. No DNS or
+Pages custom-domain setting changed. The static edition uses only bundled data;
+mounted source reads and `/api/health` require the Node edition.
 
 ## Architecture and records
 
@@ -152,7 +153,7 @@ Reviewable browser/runtime evidence is kept under the ignored `proof/`
 directories; the acceptance record in [docs/proof.md](docs/proof.md) names the
 exact run and limitations.
 
-The authorized initial commit, public remote, and Pages deployment are recorded
-in [docs/proof.md](docs/proof.md). No OAuth grant, provider/model action,
-telemetry, credential, or DNS change was made. See [LICENSE](LICENSE) for the
-project license.
+The authorized initial and corrective commits, public remote, and Pages
+deployments are recorded in [docs/proof.md](docs/proof.md). No OAuth grant,
+provider/model action, telemetry, credential, or DNS change was made. See
+[LICENSE](LICENSE) for the project license.
