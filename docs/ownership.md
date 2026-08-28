@@ -2,43 +2,55 @@
 
 ## Canonical Project
 
-- Name: Online Sourdough Skills Atlas
-- Outcome: Provide a public-first, self-hostable Skills Atlas that distributes Online Sourdough skills and lets teams inspect, govern, connect, and deploy their own Git-backed skill library safely.
-- Technical source of truth: this repository
-- Lifecycle owner: Project owner role, represented by the AIOS lead during
-  Build/Review and by the receiving operator after an authorized handoff
+- Name: Skill Atlas
+- Outcome: provide a public-first, self-hostable interface that helps teams
+  understand and safely improve Git-backed skill libraries.
+- Application source of truth: this repository.
+- Skill-content source of truth: each imported GitHub repository.
+- Lifecycle owner before handoff: project owner at the authorized Ship gate.
+- Runtime owner after an authorized handoff: receiving operator.
+
+The Project owns one independent application lifecycle. An imported repository
+does not own Atlas operation, and Atlas does not become a competing source for
+its skills.
 
 ## Responsibilities
 
-Record one owner for each material responsibility, data source, external
-dependency, trust boundary, and operational decision. Link to the authoritative
-contract rather than copying it into this record.
+| Responsibility                                | Source of truth                                            | Owner                   | Failure or escalation route                               |
+| --------------------------------------------- | ---------------------------------------------------------- | ----------------------- | --------------------------------------------------------- |
+| Outcome and boundaries                        | [spec.md](spec.md)                                         | Project owner role      | AIOS lead before lifecycle/authority change               |
+| Implementation and tests                      | This repository                                            | Build maintainer        | [review.md](review.md) gate                               |
+| Product/design behavior                       | [design.md](design.md)                                     | Build maintainer        | Browser proof and owner Review                            |
+| Public-safe Offline example                   | `src/data/bundled-skills.ts`                               | Build maintainer        | Content/security Review before change                     |
+| Imported skill content                        | Imported GitHub repository                                 | Repository owner        | Provider access or source correction                      |
+| GitHub availability/API behavior              | GitHub                                                     | Receiving operator      | Retain active plugin; inspect provider status/rate limits |
+| Admin password/token scope and rotation       | Operator environment                                       | Receiving operator      | Revoke/rotate, restart, and reauthenticate                |
+| TLS and network access boundary               | Operator infrastructure                                    | Receiving operator      | Access proxy/TLS incident process                         |
+| In-memory sessions and browser plugin state   | Running Node/browser session                               | Receiving operator/user | Restart/reload and re-import                              |
+| Proposal branch/PR review and orphan branches | Imported repository                                        | Repository owner        | GitHub review or authorized cleanup                       |
+| Build, health, logs, and recovery             | [operations.md](operations.md), [recovery.md](recovery.md) | Receiving operator      | Stop/rebuild/restart; retain source truth                 |
+| Static release and GitHub Pages               | `dist/static`, manual workflow, `public/CNAME`             | Project owner role      | Separate Review/Ship authorization                        |
+| Simply DNS CNAME                              | `skills.onlinesourdough.com` → `onlinesourdough.github.io` | Receiving DNS owner     | Ship verification or DNS rollback                         |
 
-| Responsibility   | Source of truth                                             | Owner              | Failure or escalation route                      |
-| ---------------- | ----------------------------------------------------------- | ------------------ | ------------------------------------------------ |
-| Project outcome  | [README.md](../README.md)                                   | Project owner role | AIOS lead before a lifecycle decision            |
-| Implementation   | This repository                                             | Build maintainer   | Project owner role; review gate                  |
-| Operation        | [operations.md](operations.md)                              | Receiving operator | Health failure or source warning                 |
-| Recovery         | [recovery.md](recovery.md)                                  | Receiving operator | Stop, rebuild, fallback rehearsal                |
-| Bundled data     | [src/data/bundled-skills.ts](../src/data/bundled-skills.ts) | Build maintainer   | Review any content/source change                 |
-| Mounted Git data | Operator-selected `SKILLS_REPO_PATH`                        | Receiving operator | Source adapter warning; use bundled fallback     |
-| Design direction | [design.md](design.md) and approved handoff                 | Project owner role | Review visual/accessibility drift                |
-| Static artifact  | `dist/static` contract and manual Pages workflow            | Build maintainer   | Rebuild/review; publish only with Ship authority |
-| Public release   | Canonical remote, Pages environment, custom domain, and DNS | Project owner role | AIOS lead/owner Ship gate                        |
+## Credential and data boundary
 
-## Boundary
+The receiving operator owns `ATLAS_ADMIN_PASSWORD`, `GITHUB_TOKEN`, environment
+permissions, and least-privilege repository selection. The Build maintainer
+does not receive or record them. Private repository source may exist in process
+memory and the authenticated browser view only after an authorized self-hosted
+read; it must not be copied into the checked-in Offline example, proof records, static
+artifact, or logs.
 
-The Project is canonical after creation. Context providers and adjacent
-repositories may be referenced as inputs, but they do not own this Project's
-runtime truth.
+The `Offline example` is original fictional product content. It is not exported
+from, attributed to, or inferred from the anonymously unavailable canonical
+repository.
 
-No person-specific measurement owner was supplied in the upstream Build
-contract. Long-term adoption measurement is therefore pending an owner
-decision; acceptance evidence for this Build is owned by the AIOS lead's
-Review gate and recorded in [proof.md](proof.md).
+## Delivery boundary
 
-The authorized initial and corrective Ships established the canonical public
-remote and current Pages release recorded in [proof.md](proof.md). The Project
-owner role owns that release state, custom-domain verification, and DNS. The
-current post-Ship record edits are an unstaged evidence handoff only; they do
-not mutate the published release without a later owner-authorized Ship.
+Lead Review passed for r4. The project owner owns source publication and the
+later Pages deployment/run, custom-domain, DNS, and TLS verification, which
+remain pending and unverified until their Ship steps.
+
+Long-term adoption measurement still has no named owner or window. The product
+therefore makes no usage claim; acceptance is behavior/security evidence in
+[proof.md](proof.md).

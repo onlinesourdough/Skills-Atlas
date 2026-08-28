@@ -1,41 +1,77 @@
-export type SourceKind = "bundled" | "local";
-
+export type PackSource = "example" | "github" | "local";
+export type RepositoryAccess = "read" | "write";
 export type GraphTone = "blue" | "mint" | "gold" | "violet" | "clay";
+export type PluginComponent = "skills" | "apps" | "mcpServers";
 
 export interface AtlasSkill {
   slug: string;
   name: string;
   description: string;
   category: string;
-  version: string;
-  reviewed: string;
   sourcePath: string;
-  excerpt: string;
+  markdown: string;
   relations: string[];
-  usage: number;
   tone: GraphTone;
+}
+
+export interface AtlasPack {
+  kind: "atlas-pack";
+  id: string;
+  repository: string;
+  repositoryUrl?: string;
+  defaultBranch: string;
+  revision: string;
+  access: RepositoryAccess;
+  source: PackSource;
+  snapshotLabel: string;
+  components: PluginComponent[];
+  skills: AtlasSkill[];
 }
 
 export interface AtlasSnapshot {
   kind: "atlas-snapshot";
-  source: SourceKind;
-  repository: string;
-  skills: AtlasSkill[];
+  pack: AtlasPack;
   warning?: string;
 }
 
 export interface AtlasHealth {
   status: "ok";
-  source: SourceKind;
-  skills: number;
-  fallback: boolean;
+  mode: "self-hosted";
+  adminConfigured: boolean;
+  githubConfigured: boolean;
+  sessions: "memory";
 }
 
-export type FixtureName = "success" | "loading" | "empty" | "error" | "permission" | "offline";
+export interface SessionState {
+  kind: "atlas-session";
+  mode: "static" | "self-hosted";
+  authenticated: boolean;
+  adminAvailable: boolean;
+  providerAvailable: boolean;
+}
 
-export interface AskAnswer {
+export interface ProposalRequest {
+  repository: string;
+  path: string;
+  baseSha: string;
+  content: string;
   title: string;
-  body: string;
-  related: string[];
-  matched: boolean;
+  proposalId: string;
+}
+
+export interface ProposalResult {
+  kind: "proposal";
+  branch: string;
+  pullRequestUrl: string;
+  pullRequestNumber: number;
+}
+
+export type RepositoryHealthSeverity = "good" | "attention";
+
+export interface RepositoryHealthSignal {
+  id: "loaded" | "metadata" | "relations";
+  label: string;
+  detail: string;
+  count: number;
+  severity: RepositoryHealthSeverity;
 }

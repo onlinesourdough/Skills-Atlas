@@ -1,29 +1,89 @@
 # Operations and self-host setup
 
-## Local and production boot
+## Build and boot
 
-Install from the committed lockfile, then use the browser-only preview or the
-complete Node unit:
+Use Node 20.19 or newer and install from the committed lockfile:
 
 ```sh
 npm ci
-npm run dev
-
-# complete self-hostable artifact
 npm run boot
 ```
 
-`npm run boot` runs the reproducible client/server build and then starts the
-single process. `npm run start` starts an already-built `dist/` directory.
-The default address is `http://127.0.0.1:4173`; stop it with Ctrl-C.
+`npm run boot` builds `dist/client` and `dist/server`, then starts the single
+Node process. `npm run start` starts an already-built artifact. The default
+listener is `http://127.0.0.1:4173`; stop it with Ctrl-C.
 
-For a networked local deployment, set `HOST` to an intentional bind address
-and keep the process behind the operator's normal access/TLS boundary. The
-application does not provide authentication or TLS itself.
+The no-configuration state is intentional: startup attempts an anonymous read
+of `onlinesourdough/Skills`; other public imports, Graph, Library, Usage/health,
+Plugins, and search work without a credential. If startup cannot reach public
+source, the fictional `Offline example` remains available with Retry. Account
+state is public; private reads and edits are unavailable.
 
-## Static public artifact
+## Operator configuration
 
-Build and review the provider-free public edition with:
+Supply configuration through the process environment or an operator-owned
+secret manager. [`.env.example`](../.env.example) is documentation only; the
+application does not load dotenv files itself.
+
+| Value                   | Purpose                                          | Required behavior                                      |
+| ----------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| `ATLAS_ADMIN_PASSWORD`  | Independent self-hosted admin boundary           | Use a long unique value; never reuse the GitHub token  |
+| `GITHUB_TOKEN`          | Server-only authenticated GitHub reads/proposals | Choose least privilege for only intended repositories  |
+| `ATLAS_COOKIE_SECURE=1` | Adds `Secure` to the session cookie              | Required whenever the browser reaches Atlas over HTTPS |
+| `HOST`                  | Listener bind                                    | Defaults to `127.0.0.1`; broaden only intentionally    |
+| `PORT`                  | Listener port                                    | Defaults to `4173`; accepted range is 1024–65535       |
+
+For a fine-grained GitHub token, private reads need repository metadata and
+Contents read access. Proposals additionally need Contents read/write and Pull
+requests write access. GitHub's returned repository permission still decides
+whether the UI shows `Read only` or `Can edit`.
+
+The Node process does not terminate TLS or provide an Internet access proxy.
+When network-exposed, place it behind the operator's authenticated HTTPS
+boundary, protect environment visibility, and set the secure-cookie flag.
+
+## Admin and private repository journey
+
+1. Open the account control and sign in with `ATLAS_ADMIN_PASSWORD`.
+2. Open Plugins and submit `owner/repository`.
+3. Node uses `GITHUB_TOKEN` only for that authenticated request.
+4. Confirm repository identity, observed revision, skill count, and effective
+   access in Plugins.
+5. Open a skill in Library. `Propose edit` appears only when access is
+   `Can edit`; otherwise the complete source remains read-only.
+
+Anonymous imports always omit the server token. A 404 displays
+`Repository unavailable or private` and does not reveal whether the repository
+exists. The previously active plugin remains selected after a failed import.
+
+## Health and logs
+
+```sh
+curl -fsS http://127.0.0.1:4173/api/health
+```
+
+Healthy output has this shape:
+
+```json
+{
+  "status": "ok",
+  "mode": "self-hosted",
+  "adminConfigured": false,
+  "githubConfigured": false,
+  "sessions": "memory"
+}
+```
+
+Configuration booleans may be true without exposing values. Request logs
+contain request ID, normalized route, status, outcome, and duration. They omit
+query strings, cookies, headers, repository identifiers, Markdown, passwords,
+and tokens.
+
+Restarting the process revokes all admin sessions. Imported plugins also live
+only in the current browser session; reload retries the canonical default and
+uses the Offline example if that read fails.
+
+## Static artifact
 
 ```sh
 npm ci
@@ -31,94 +91,51 @@ npm run build:static
 npm run preview:static
 ```
 
-The artifact is `dist/static/`. It contains the bundled snapshot, local fonts,
-`CNAME` for `skills.onlinesourdough.com`, and `.nojekyll`. Static mode does not
-request `/api/skills`, display a false live-source error, accept a mounted
-checkout, or expose `/api/health`.
+`dist/static` contains the credential-free Offline example, canonical startup
+identifier, and local assets. It has no session or write endpoint. Canonical
+startup and manual public imports call GitHub directly without credentials. The
+exact artifact is tested at both `/` and `/Skills-Atlas/` by
+`npm run browser:proof`.
 
-The [Pages workflow](../.github/workflows/pages.yml) is manual-only.
-It runs the full local gate, rebuilds the static artifact, and uses GitHub's
-official Pages artifact/deploy actions pinned to reviewed immutable commits.
-The canonical public remote is
-[`onlinesourdough/Skills-Atlas`](https://github.com/onlinesourdough/Skills-Atlas).
-Initial [run 32969456173](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32969456173)
-delivered commit `5bc468625703a1f87a2a3ece431645c3aab3ac0a`. Corrective
-[run 32974304026](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32974304026)
-delivered commit `0a57991d35fe736b3864fe3699ec5393248a03ad`; build job
-`98195180614`, deploy job `98195355812`, deployment `6104798328`, and final
-status `17362227930` all report `success`. Pages uses workflow build type,
-HTTPS enforcement is enabled, and the platform URL is
-`https://onlinesourdough.github.io/Skills-Atlas/`.
+GitHub Pages is the single public deployment owner. The SHA-pinned workflow is
+manual and publishes `dist/static`; `public/CNAME` declares
+`skills.onlinesourdough.com`, and the receiving Simply DNS CNAME target is
+`onlinesourdough.github.io`. Lead Review passed for r4. The Pages run and
+deployment, custom domain, DNS, and TLS remain pending and unverified until
+their later Ship steps. Do not infer current source truth from an older release.
 
-The initial bundle used `/` as its static base, so its root-relative assets
-returned 404 at the repository subpath. The corrective release uses `./` only
-for static production mode; the Node client keeps `/`. Local proof serves the
-exact built `dist/static` directory at both `/` and `/Skills-Atlas/`. Live
-Chrome now completes the prefixed five-step onboarding plus Graph →
-Library/edit denial → Usage → Ask journey. All 14 static requests return 200,
-there are zero API requests, and browser diagnostics are clean.
+## Routine verification
 
-The checked-in and deployed `CNAME` remains `skills.onlinesourdough.com`, but
-the Pages API reports `cname: null`. Public DNS returns NXDOMAIN for CNAME, A,
-and AAAA queries for that host.
-
-An authorized DNS owner must still create and verify the unresolved Simply DNS
-CNAME `skills.onlinesourdough.com` → `onlinesourdough.github.io`, then activate
-and verify the custom domain in GitHub Pages and recheck HTTPS plus Graph →
-Library → Usage → Ask. The corrective Ship changed neither DNS nor the Pages
-custom-domain setting.
-
-Current delivery state can be read without rebuilding:
+Before a Review or artifact handoff, run:
 
 ```sh
-gh run view 32974304026 --repo onlinesourdough/Skills-Atlas
-gh api repos/onlinesourdough/Skills-Atlas/pages
-gh api repos/onlinesourdough/Skills-Atlas/deployments/6104798328/statuses
+npm run check
+npm run docs:check
+npm run security:check
+npm audit --audit-level=high
+npm audit --omit=dev --audit-level=high
+npm run browser:proof
 ```
 
-## Source configuration
+Security check requires a current `dist/static` and scans it for credentials,
+owner-home paths, failed-fetch text, and the withheld observed private revision
+marker. Browser proof starts isolated local servers with deterministic
+anonymous-GitHub fixtures; its `Can edit` and proposal result are intercepted
+and never reach GitHub.
 
-Copy [`.env.example`](../.env.example) to an operator-owned environment (do
-not commit the copy). `SKILLS_REPO_PATH` is optional and must point to the
-checkout root, not directly to `skills/`. The expected shape is:
+## Provider failure operation
 
-```text
-checkout/
-└── skills/
-    └── a-safe-slug/
-        └── SKILL.md
-```
+- Rate limited or unavailable: keep the active plugin and retry after the
+  provider window; do not add unbounded retries.
+- Authentication denied: sign out, rotate or correct server configuration,
+  restart, and sign in again.
+- Permission denied: keep the plugin read-only or correct provider-side access;
+  never override the label client-side.
+- Stale source: refresh/import the plugin before preparing a new proposal.
+- Duplicate branch: use a new proposal action; do not force-update the existing
+  branch.
+- Failure after branch creation: inspect the named orphan branch in GitHub.
+  Preserve or remove it through an authorized repository-owner workflow; Atlas
+  does not delete it automatically.
 
-The source file begins with `---`, contains exactly `name` and `description`
-frontmatter fields, and has a non-empty Markdown body. The server reads the
-source on request. Missing configuration uses the bundled snapshot; a
-configured source that is empty, invalid, too large, unsafe, or unavailable
-also uses the bundled snapshot and exposes a safe warning in the UI.
-
-## Health and failure visibility
-
-```sh
-curl -fsS http://127.0.0.1:4173/api/health
-```
-
-Healthy output has the shape `{"status":"ok","source":"bundled|local","skills":N,"fallback":false|true}`.
-The health route remains 200 when a configured source falls back: `fallback`
-and the browser warning make the degraded but usable state visible. Request
-logs are structured and redacted.
-
-## Rebuild and handoff
-
-Run `npm run check` before an artifact handoff. It produces both the regular
-client/server build and the static public build. The server-backed local source
-and health endpoint require the Node process.
-There is no database or persistent application state to back up. The mounted
-Git checkout is an operator-owned input and must be backed up by its own Git
-remote or filesystem policy.
-
-## Distribution boundary
-
-The Atlas does not install skills into agent harnesses. For supported
-project-local distribution, follow the canonical Skills repository's pinned
-installer/recovery record and verify the source revision separately. Keep
-Atlas application operation and skill payload distribution as two explicit
-owner decisions.
+See [recovery.md](recovery.md) for the tested restart and safe rollback paths.

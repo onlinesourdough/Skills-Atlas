@@ -1,107 +1,83 @@
 # Project Review
 
-Result: PASS · reviewed dual-root correction delivered · post-Ship records
-awaiting lead Review · 2026-08-26
+Lead Review passed on 2026-08-28 for contract r4 after independent diff,
+automated, browser, and visual verification. Remaining release verification is
+tracked below.
 
-## Scope and comparison point
+## Review scope
 
-Reviewed the actual unstaged diff from published baseline commit
-`5bc468625703a1f87a2a3ece431645c3aab3ac0a` against the lead's reproduced
-repository-subpath failure, the r2 product contract, the authorized initial
-Ship evidence, and the current Build-only correction boundary. The comparison
-includes the preserved four post-Ship records, Vite mode selection, the exact
-static production artifact, browser-proof behavior, architecture, technology,
-operation, proof, and recovery.
+Reviewed the full working-tree delta from
+`5efd6ff1f43108030e541411a84ddd6c68451fcd`, preserving accepted r3.4 product
+work and adding release-ready canonical startup, offline recovery, source
+navigation, open-source files, deployment truth, deterministic proof, and
+current lifecycle records.
 
-The repository remains one independently owned, stateless Project. This
-revision made no staged change, commit, push, workflow dispatch, Pages-setting
-change, deployment, DNS change, credential action, or other external mutation.
-That sentence records the pre-Ship Review boundary. The subsequent lead and
-publish-safety gates passed and authorized corrective Ship r10: commit
-`0a57991d35fe736b3864fe3699ec5393248a03ad`, one normal push, and one successful
-Pages run `32974304026`. The post-Ship factual edits in this record remain
-unstaged and await lead Review.
+During the 2026-08-28 Review, the pre-existing `.playwright-cli/` remained
+untracked and unstaged, and no adjacent repository mutation, credential use,
+authenticated adjacent read, real provider write, workflow dispatch, Pages
+deployment, or domain/DNS action occurred.
 
 ## Findings
 
-- Critical: none.
-- Required: none after revision.
-- Improvement: assign a long-term outcome-measurement owner and window before
-  measuring adoption. No telemetry was added to compensate for that upstream
-  ownership gap.
+- Critical: none open.
+- Required: none open in worker evidence.
+- Improvement: the static client emits Vite’s approximately 500 kB chunk
+  warning. Its gzip size remains about 155 kB; route splitting is a future
+  measured-performance option, not a release correctness blocker.
 
-The Required finding in this revision was reproduced before the fix: the
-initial static build used `/`, so repository-prefixed HTML requested JS, CSS,
-fonts, and favicon from the organization root and failed. Static production
-mode now uses `./`; the regular Node client remains `/`. The existing
-browser-proof owner mounts the same `dist/static` directory at root and
-`/Skills-Atlas/` and keeps the failure executable as a regression.
+Closed in r4:
 
-The four prior lifecycle findings—mounted-category visibility, shared parser/
-client bounds, immutable workflow action pins, and public-documentation
-redaction—remain closed and unchanged.
+1. Startup now attempts `onlinesourdough/Skills` through the anonymous adapter,
+   validates canonical identity/URL, normalizes access to read-only, activates
+   the five-skill result, and upserts without duplication.
+2. Unavailable/private and rate-limit failures retain a clearly unattributed
+   `Offline example`; one calm status offers Retry and never claims repository
+   truth.
+3. The canonical manifest form `skills: "./skills/"` is accepted without
+   weakening safe relative-path validation.
+4. The topbar has one accessible, safe-new-tab GitHub source link before the
+   honest account control; desktop grid and mobile fit remain proven.
+5. README, `CONTRIBUTING.md`, `SECURITY.md`, package metadata, lifecycle docs,
+   and recovery now state source, issues, MIT license, self-hosting, GitHub
+   Pages ownership, `public/CNAME`, Simply DNS target, and Build/Ship boundary.
+6. Static publication scanning allows the canonical identifier required for
+   startup while still rejecting credential shapes, owner paths, failed-fetch
+   text, and the withheld observed revision.
 
-Review also found pre-Ship state language left in security, ownership, and the
-Spec after the deliberately four-file post-Ship documentation handoff. Those
-records now distinguish the historical creation boundary, authorized initial
-release, and the correction state at Review time without changing
-responsibility or authority.
+Previously closed and preserved: safe full-Markdown rendering, existence-safe
+anonymous 404, server-only credentials, admin/session boundaries, permission
+and stale-SHA rechecks, branch-plus-pull-request-only writes,
+direction-independent Graph edges, category emphasis without filtering,
+hash/history synchronization, honest usage, source-declared components, and
+the accepted responsive visual system.
 
-Lead revision r9 found one remaining Required documentation-truth
-contradiction: the Spec still presented its original no-remote/no-publication
-Build boundary as current and treated deployment, publication, and the
-canonical remote as unowned. The Spec now preserves that boundary as history,
-records the authorized initial Ship, and assigns external release actions to
-the lifecycle/Ship path rather than the browser or Node runtime. No product,
-runtime, workflow, dependency, or proof behavior changed. The finding is
-closed before retaining project-local PASS.
+## Worker evidence gates
 
-## Gate evidence
+- Correctness: 6 files / 38 tests plus real-browser journeys cover startup,
+  fallback/retry/deduplication, provider bounds and failures, sessions,
+  permissions, proposals, Graph, Library, Usage, Plugins, and static roots.
+- Security/privacy: no private source body or observed private revision is
+  bundled; anonymous Node startup omits the configured token; static mode has no
+  local API/write path; provider writes are deterministic mocks only.
+- Simplicity: the resolved React/Vite/TypeScript + Node stack, official GitHub
+  REST API, browser-memory plugins, and memory sessions remain sufficient. No
+  dependency, framework, database, OAuth service, queue, runtime model, or new
+  hosting layer was added.
+- Operation/recovery: GitHub Pages is the single public deployment owner;
+  self-hosted Node, failed startup, restart/session loss, stale source, and
+  orphan proposal branch recovery are documented and tested proportionately.
 
-- Intent/correctness: PASS. The change is limited to static asset resolution
-  and its proof. Node mode, runtime UI/data, server behavior, workflow, and
-  dependencies are unchanged.
-- Evidence: PASS. The prefixed regression failed red against the shipped base
-  with CSS/JS/favicon 404s, console/request failures, no font success, and no
-  onboarding shell. After the correction, `npm run browser:proof` passes Node
-  desktop/mobile plus root and prefixed static mounts with an empty failure
-  list. The prefixed mount completes all five onboarding pages, Graph,
-  Library/detail/edit denial, Usage demo truth, and deterministic Ask. Root and
-  prefix each record document, JS, CSS, all three fonts, and favicon at 200,
-  zero API requests, and zero page/console/request/response failures.
-- Project checks: PASS. `npm run check` passes formatting, lint, strict
-  client/server types, 3 test files with 16 tests, Node build, and static build.
-  Full and production dependency audits report zero vulnerabilities.
-- Documentation/security: PASS. README, operations, proof, recovery,
-  architecture, technology, security, ownership, Spec, and this review
-  distinguish the initial live limitation, reviewed correction, and authorized
-  corrective delivery. Local links and the
-  secret/publish-safety/immutable-action scan pass.
-- Simplicity/architecture/technology: PASS. One mode-dependent Vite base and
-  one extended existing proof runner solve the gap without a framework,
-  dependency, workflow branch, provider, or runtime compatibility layer. The
-  same built files are tested twice rather than producing host-specific
-  artifacts.
-- Operation/recovery: PASS. The reviewed forward-corrective path was exercised
-  by one normal push and one successful Pages dispatch. The initial commit is
-  the corrective commit's reviewed parent; a reviewed revert/forward fix and
-  Pages disable without repository deletion remain available. No rollback was
-  needed.
+## Evidence and residual gates
 
-## Evidence and limitations
+The exact command results, browser observations, and screenshots are recorded
+in [proof.md](proof.md). Pre-Ship evidence is green for
+`npm run check`, docs/security checks, both audits, `npm run browser:proof`, and
+`git diff --check`.
 
-Fresh structured evidence is `proof/runtime/browser-proof.json`; ignored
-screenshots include `r3-static-root.png` and `r3-static-prefixed.png`. The
-corrected artifact is locally and live proven at the repository subpath. Run
-`32974304026`, deployment `6104798328`, status `17362227930`, artifact
-`9608834607`, and the live Chrome journey all bind to the corrective commit.
-Custom-domain DNS remains absent, and no custom-domain journey is claimed.
+Still pending and unverified: safely public Skills history, real anonymous
+current source proof, successful pinned Pages workflow and deployment,
+domain/DNS target, and HTTP/TLS verification. GitHub availability and rate
+limits, operator token scope, memory-session loss, and recoverable orphan
+branches remain residual runtime risks.
 
-No live provider/private-source behavior, write path, telemetry, adoption
-window, runtime model, custom-domain verification, or DNS action was available
-or authorized.
-
-**PASS** — reviewed source delivery, recovery, and live repository journey are
-verified. Smallest next action: AIOS lead Review of the exact unstaged
-post-Ship records. No further push, workflow run, Pages change, or DNS action
-is authorized.
+**Lead Review r4: PASS. Remaining release checks are tracked above.**

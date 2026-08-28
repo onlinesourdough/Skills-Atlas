@@ -1,114 +1,125 @@
 # Project-local Spec
 
-Status: baseline contract fulfilled through the authorized initial and
-corrective Ships; post-Ship evidence records awaiting lead Review, 2026-08-26.
+Status: **REVIEW PASSED — Ship verification pending**, 2026-08-28. This is the
+single delta contract for lifecycle `skills-atlas-remy-github-r3`; no duplicate
+planning artifact is required.
 
 ## Canonical evidence
 
-- Upstream intent, boundary, proof, and authority: the AIOS worker Build
-  contract `project Build contract, r1` supplied for this repository.
-- Superseding owner revision: `project-worker-parity-r2.md`, which reopens
-  Build/Review for reference-structure parity and static Pages preparation
-  while preserving the original IP, source, security, and Ship boundaries.
-- Visual direction and interaction proof: an approved portable
-  reference-product handoff, especially its design record and proof run
-  `online-sourdough-skills-atlas-r4`. The externally retained research input is
-  evidence only and is not included in this repository.
-- Source shape and distribution facts: the read-only canonical Online
-  Sourdough Skills repository, whose payload is
-  `skills/<slug>/SKILL.md`.
-- Repository ownership at creation: this checkout began as a fresh independent
-  Project on `main`, with an unborn HEAD and no remote. The authorized initial
-  Ship later established the canonical public remote recorded in
-  [proof.md](proof.md); this repository still owns implementation, operation,
-  proof, and recovery.
+- Upstream outcome, acceptance, authority, and no-Ship boundary: AIOS lead r4
+  contract linked to goal `01a03d16-9e41-7250-a6b8-f183d6ee439d`.
+- Starting application truth: this repository on `main` at
+  `5efd6ff1f43108030e541411a84ddd6c68451fcd` plus the r3.4 working-tree state
+  accepted during Review.
+- Canonical skill source when its public-history remediation is complete:
+  `https://github.com/onlinesourdough/Skills`. The reviewed adjacent candidate
+  declares a skills-only Codex plugin and five slugs: `clarify`,
+  `manage-skills`, `orchestrate-workers`, `route-models`, and `shape-offer`.
+  Its full private skill bodies and current revision are not Atlas Build inputs.
+- Public application/source targets:
+  `https://skills.onlinesourdough.com` and
+  `https://github.com/onlinesourdough/Skills-Atlas`.
+- Deployment owner: the existing pinned, manual GitHub Pages workflow and
+  checked-in `public/CNAME`. The receiving DNS owner points the custom hostname
+  at `onlinesourdough.github.io` during its later Ship step.
+- Product/design truth: accepted r3.4 warm, calm, Remy-near/Notion-like shell
+  and responsive evidence. r4 adds source state and one GitHub navigation
+  affordance without reopening that composition.
 
-## Resolved contract
+This repository remains the independent owner of one static public application
+and one optional self-hosted Node mode. GitHub owns repository content and
+history; Atlas is a read-oriented human interface and permission-aware proposal
+surface, never a competing content store.
 
-The Atlas serves founder-led companies and small teams that need to discover,
-inspect, govern, and distribute the repeatable skills used by their agents.
-The public demo must work without an account, secret, provider grant, or live
-telemetry. A bundled safe snapshot is the default source; a local mounted Git
-checkout may be selected by the operator as a read-only server-side source.
-The Git repository remains canonical and the Atlas is its readable map,
-governance, discovery, and optional activity layer.
+## Evidence-state audit
 
-The smallest complete result is one responsive browser application with:
+- **RESOLVED:** initial boot should attempt an anonymous bounded read of
+  `onlinesourdough/Skills`; a successful result becomes active and displays its
+  provider identity, observed revision, five loaded skills, and `Read only`.
+- **RESOLVED:** the source is still private or anonymously unavailable before
+  Ship. Pre-Ship work must not make an authenticated adjacent read, embed its
+  source/revision, or claim live success. Startup success is
+  fixture/interception proven.
+- **RESOLVED:** unavailable, private, rate-limited, timeout, and provider-error
+  startup all fail to the same public-safe fictional content, visibly named
+  `Offline example`, with one calm status and Retry action.
+- **RESOLVED:** the existing React/Vite/TypeScript + Node stack, bounded GitHub
+  adapter, browser-memory plugin state, and manual Pages workflow own all new
+  responsibilities. No technology or dependency addition is justified.
+- **RESOLVED:** public release needs concise contribution/security policy and
+  README links to the site, source, Skills repository, issues, and MIT license.
+  `package.json` remains `private: true` solely to prevent npm publication.
+- **MISSING but non-blocking before Ship:** anonymous live-source success, exact
+  release commit, Pages run, custom-domain response, DNS target, and TLS are
+  Ship evidence. Pre-Ship records them as gates and does not infer them.
 
-- a graph-dominant light product shell with slim Graph/Library/Usage tabs and a
-  narrow department/read-only source taxonomy;
-- a five-page first-visit public walkthrough with deterministic replay,
-  keyboard focus, Back/Next/Skip/Escape, restrained progress, and a public
-  completion action;
-- softly clustered relation graph, three-region searchable/filterable library
-  with persistent detail/editor shape, safe excerpt and read-only edit denial,
-  global search, ranked/quiet demo usage, subordinate demo activity, and a
-  floating deterministic bundled Ask panel;
-- Sync / setup that explains least privilege and only simulates a local safe
-  preview connection;
-- explicit loading, empty, error, permission, success, offline, hover, active,
-  focus, reduced-motion, and mobile states;
-- a bounded parser and local source adapter for valid `skills/<slug>/SKILL.md`
-  files, with safe fallback when the configured source is absent or invalid;
-- reproducible local boot/build, health reporting, no-secret logs, docs,
-  recovery, tests, and reviewable browser/runtime evidence.
-- during the original Build, a static public build and manual GitHub Pages
-  workflow prepared for `skills.onlinesourdough.com`; that boundary stopped
-  before remote creation, publication, or DNS changes. The later authorized
-  initial Ship established the canonical public remote and Pages deployment.
-  The authorized corrective Ship then delivered the dual-root static artifact;
-  DNS remains unchanged, and the Node self-host path remains complete.
+## Intended result
 
-## Boundaries and non-goals
+On initial product boot, Atlas automatically attempts the canonical Skills
+repository through the same bounded tokenless adapter used for manual public
+imports. Success replaces the fallback as the active plugin without creating a
+duplicate, keeps GitHub canonical, and exposes only provider-returned source,
+revision, inventory, relations, components, and read permission.
 
-The repository owns the UI, bundled demo data, parser, local filesystem
-adapter, HTTP health/data surface, operation docs, and proof. It consumes the
-approved design tokens/fonts and the documented canonical Skills file shape.
+If the attempt cannot succeed, Atlas stays fully useful with the checked-in
+fictional `Offline example`. One subdued, actionable status explains that live
+skills are unavailable and offers Retry. The example never receives a GitHub
+URL, canonical repository attribution, observed revision, or live claim.
 
-The browser and Node application do not implement or attempt OAuth, private
-repository access, writes, provider integration, publication control,
-telemetry ingestion, authentication, a database, a queue, runtime AI/model
-calls, a cloud backend, or canonical-remote management. External repository,
-release, Pages, custom-domain, and DNS actions remain lifecycle/Ship-owned
-operations, not runtime responsibilities. Manual token and GitHub App are
-described as future operator choices only; no credential path is implemented.
+The existing topbar gains one inline-SVG GitHub link immediately before the
+honest account control. It targets the Atlas source repository, opens safely,
+has an accessible name/title/focus state, and preserves the 176px desktop
+rail/tab grid and mobile fit.
 
-## Interfaces and trust boundaries
+## Boundaries and interfaces
 
-- Browser to server: `GET /api/health` and `GET /api/skills`; JSON is
-  validated at the client boundary and failures fall back to bundled data.
-- Server to local checkout: an optional `SKILLS_REPO_PATH` root, constrained to
-  `skills/<safe-slug>/SKILL.md`; symlinks, path escape, invalid frontmatter,
-  oversized files, excessive entries, and read failures are denied or safely
-  reduced to fallback.
-- Browser trust: all rendered source content is text; React escaping and an
-  excerpt limit prevent markup execution. No secret is sent to the browser or
-  written to logs.
-- Deployment unit: one Node process serving the built browser assets and API;
-  bundled data keeps the public route useful when the adapter is unavailable.
+- Static startup → GitHub: anonymous `GET` requests only, using the existing
+  bounded REST transport. No credential input, storage, cookie, or write path.
+- Node public startup → `GET /api/packs/import?repository=onlinesourdough/Skills`
+  without an admin cookie; the server therefore omits its configured token.
+- Manual imports retain current behavior. Private reads and every proposal
+  write remain server-only behind independent admin session plus server token.
+- Startup plugin state stays in browser memory. Retry upserts by normalized
+  provider identity and never duplicates the canonical plugin. A manual user
+  selection made during an in-flight startup read is not overwritten.
+- Anonymous 404 remains existence-safe: `Repository unavailable or private`.
+  Rate limit, timeout, malformed/oversized source, and provider failure remain
+  bounded and do not replace the active plugin.
+- Rendering, full-source preservation, manifest declarations, graph topology,
+  usage truth, permission labels, and branch-plus-PR policy retain r3.4 security
+  contracts.
+- `dist/static` contains the fictional fallback and canonical repository name
+  needed to initiate the anonymous read, but no private source bodies, private
+  revision, credential, failed-fetch output, or owner-local path.
 
-## Ordered results and proof points
+## Ordered complete results and proof
 
-1. Project records and design-token-based browser shell — verified by local
-   links, type/build checks, and desktop/mobile browser review.
-2. Deterministic atlas behavior and access states — verified by unit/contract
-   tests and real interaction journeys.
-3. Parser/source boundary and fallback — verified by valid, invalid,
-   oversized, empty, path-escape, symlink, and fallback tests.
-4. Self-host operation and recovery — verified by production start, health,
-   critical journey, disposable source rebuild, and fallback rehearsal.
+1. **Startup contract:** deterministic tests prove canonical success, read-only
+   normalization, failure/rate-limit fallback, retry, identity truth, and
+   duplicate-free upsert.
+2. **Product:** initial boot uses that contract; `Offline example` plus one calm
+   Retry status handles failure; GitHub source navigation is accessible and
+   responsive without changing accepted shell alignment.
+3. **Release surface:** README, `CONTRIBUTING.md`, `SECURITY.md`, package metadata
+   explanation, and all lifecycle records describe public source, install,
+   self-hosting, security, Pages ownership, recovery, and unresolved Ship gates.
+4. **Browser proof:** deterministic Node/static interception covers centered
+   onboarding, five-skill default Graph/Library source/Usage/Plugins, GitHub
+   navigation, fallback/error/retry, write-permission mocks, clean diagnostics,
+   and exact `/` plus `/Skills-Atlas/` static assets.
+5. **Repository proof:** format, lint, strict client/server types, all tests,
+   both builds, docs/security checks, both audits, Node health, and
+   `git diff --check` pass. No provider or Ship mutation occurs.
 
-## Evidence state and residual risk
+## Ship gates and residual risk
 
-- RESOLVED: intended change, served party, result boundary, canonical source,
-  repository ownership, security posture, lifecycle authority, and external
-  Ship ownership.
-- INFERRED: Node 20+ is the supported runtime, local filesystem mounting is
-  the least-privilege adapter, and the public bundled snapshot is safe to
-  distribute. These are reversible technical choices within Build authority.
-- MISSING but non-blocking: no owner or elapsed measurement window is supplied
-  for long-term adoption. Acceptance is therefore runtime/proof based and the
-  outcome signal remains pending owner assignment.
-- Residual risk: a local checkout can change between reads; each request reads
-  a bounded snapshot and reports a safe source status, but no persistence or
-  locking is claimed. Provider integrations remain intentionally future work.
+During Ship, the Skills repository must first be safely public with remediated
+history. Ship must then prove an anonymous current read and exact five-skill
+source, dispatch and verify the pinned Pages workflow, confirm
+`skills.onlinesourdough.com` DNS points to `onlinesourdough.github.io`, and
+verify domain HTTP/TLS plus the live default journey. None of those actions or
+claims belongs to this pre-Ship finalization.
+
+GitHub availability and anonymous rate limits remain external. Memory-only
+state resets on reload. Operator token scope, single-process sessions, and
+recoverable orphan proposal branches remain the documented self-hosted risks.

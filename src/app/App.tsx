@@ -5,238 +5,248 @@ import {
   useState,
   type CSSProperties,
   type FormEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
 } from "react";
-import { BUNDLED_SKILLS } from "../data/bundled-skills.js";
-import { answerQuestion, categoriesForSkills, filterSkills, findSkill } from "../domain/atlas.js";
-import { parseSnapshotPayload } from "../domain/contracts.js";
-import type { AskAnswer, AtlasSkill, FixtureName, SourceKind } from "../types.js";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { EXAMPLE_PACK } from "../data/bundled-skills.js";
+import {
+  categoriesForSkills,
+  filterSkills,
+  findSkill,
+  graphCategoryEmphasis,
+  relationCount,
+  relationEdges,
+  repositoryHealth,
+} from "../domain/atlas.js";
+import { parsePackPayload, parseProposalResult, parseSessionPayload } from "../domain/contracts.js";
+import {
+  createGitHubFetchTransport,
+  ProviderError,
+  readGitHubPack,
+  type ProviderErrorCode,
+} from "../domain/github.js";
+import { pluginComponentLabels, resolveDefaultPlugin, upsertPlugin } from "../domain/plugin.js";
+import { parseSkillMarkdown } from "../domain/skill-parser.js";
+import type { AtlasPack, AtlasSkill, GraphTone, ProposalResult, SessionState } from "../types.js";
 
-type ViewName = "graph" | "library" | "usage" | "setup";
-type RouteName = ViewName | "start" | "detail" | "activity" | "ask";
+type ViewName = "graph" | "library" | "usage" | "plugins";
+type ReaderMode = "rendered" | "source";
+type DefaultLoadState =
+  | { status: "loading" }
+  | { status: "ready" }
+  | { status: "fallback"; code: string };
 
-const STATIC_PUBLIC_DEMO = import.meta.env.MODE === "static";
-const DEFAULT_SKILL: AtlasSkill = BUNDLED_SKILLS[0]!;
-const PRIMARY_VIEWS: Array<{ view: ViewName; label: string }> = [
+const STATIC_EDITION = import.meta.env.MODE === "static";
+const PRIMARY_VIEWS: Array<{ view: Exclude<ViewName, "plugins">; label: string }> = [
   { view: "graph", label: "Graph" },
   { view: "library", label: "Library" },
   { view: "usage", label: "Usage" },
 ];
 
-const FIXTURE_COPY: Record<
-  FixtureName,
-  { icon: string; title: string; detail: string; action: string }
-> = {
-  success: {
-    icon: "✓",
-    title: "Public snapshot ready",
-    detail: "The bundled Atlas is available without a connection or account.",
-    action: "Ready",
-  },
-  loading: {
-    icon: "…",
-    title: "Reading the source",
-    detail: "A bounded source read is in progress while the safe snapshot remains available.",
-    action: "Loading",
-  },
-  empty: {
-    icon: "∅",
-    title: "No skills found",
-    detail: "Broaden the filter or point the Node Atlas at a checkout with skills/ entries.",
-    action: "Empty",
-  },
-  error: {
-    icon: "!",
-    title: "Source read failed",
-    detail: "The bundled snapshot remains usable while an operator repairs the source.",
-    action: "Fallback",
-  },
-  permission: {
-    icon: "⊘",
-    title: "Write denied",
-    detail: "The public Atlas never enables Git writes or implies private repository access.",
-    action: "Read only",
-  },
-  offline: {
-    icon: "⌁",
-    title: "Browsing offline",
-    detail: "The packaged index still supports graph, library, search, and deterministic Ask.",
-    action: "Offline",
-  },
+const STATIC_SESSION: SessionState = {
+  kind: "atlas-session",
+  mode: "static",
+  authenticated: false,
+  adminAvailable: false,
+  providerAvailable: false,
 };
 
 const TOUR_PAGES = [
   {
-    label: "Atlas",
-    kicker: "A map for repeatable work",
-    title: "Keep team skills findable.",
+    eyebrow: "Scattered skills",
+    title: "Useful instructions end up everywhere.",
     description:
-      "See the instructions behind your agents in one calm, public-first product surface.",
-    detail: "Start with a safe snapshot. Connect a checkout only when an owner is ready.",
+      "A laptop, project folder, and agent can each carry a different copy of the same team practice.",
+    note: "The problem is not finding another tool. It is knowing which instruction is current.",
   },
   {
-    label: "Scattered",
-    kicker: "The distribution problem",
-    title: "Useful instructions scatter quickly.",
+    eyebrow: "Isolated edits",
+    title: "A good improvement can stay trapped in one copy.",
     description:
-      "A laptop, an agent folder, and a project note can each hold a different copy of the same practice.",
-    detail: "A shared map makes the drift visible without pretending to replace Git.",
+      "One teammate fixes the process while everyone else keeps running yesterday’s version.",
+    note: "Local edits need a shared review path before they become team knowledge.",
   },
   {
-    label: "Edits",
-    kicker: "Local copies diverge",
-    title: "Good edits should not stay isolated.",
+    eyebrow: "One shared library",
+    title: "Git becomes the source everyone can return to.",
     description:
-      "When improvements remain in local copies, teammates keep running yesterday’s version.",
-    detail: "The Atlas points every readable record back to one canonical source path.",
+      "Each skill has one repository path, one reviewed history, and one place to recover an earlier version.",
+    note: "The repository stays canonical. Skill Atlas makes it easier to understand.",
   },
   {
-    label: "Library",
-    kicker: "One shared shelf",
-    title: "Give the team a common library.",
+    eyebrow: "Inspect and improve",
+    title: "Work with the library without living in GitHub.",
     description:
-      "Search, inspect, and connect related skills while the repository keeps ownership of the files.",
-    detail: "Public editing stays denied; a mounted checkout is a separate operator decision.",
+      "Search, read complete skills, follow relationships, and propose an improvement from one calm surface.",
+    note: "Edits become a branch and pull request only when write permission is verified.",
   },
   {
-    label: "Latest",
-    kicker: "Reviewed distribution",
-    title: "Let everyone follow the reviewed version.",
+    eyebrow: "Reviewed distribution",
+    title: "The current version can reach the whole team.",
     description:
-      "A stable Git path makes the latest approved skill available to each supported agent harness.",
-    detail: "Enter the bundled Atlas now. No sign-in, token, or model provider is required.",
+      "After review, every supported agent can follow the same Git-backed skill instead of a disconnected copy.",
+    note: "Atlas loads the shared library when GitHub is available and keeps an offline example for recovery.",
   },
 ] as const;
 
-const CATEGORY_LAYOUT: Record<
-  string,
-  { x: string; y: string; size: string; tone: AtlasSkill["tone"] }
-> = {
-  "Shape the work": { x: "49%", y: "17%", size: "230px", tone: "blue" },
-  "Govern the shelf": { x: "19%", y: "36%", size: "180px", tone: "mint" },
-  "Route responsibly": { x: "78%", y: "36%", size: "150px", tone: "gold" },
-  "Prove the result": { x: "38%", y: "70%", size: "205px", tone: "clay" },
-  "Distribute the work": { x: "70%", y: "72%", size: "185px", tone: "violet" },
-  "Team practice": { x: "49%", y: "45%", size: "190px", tone: "mint" },
+const TONE_COLORS: Record<GraphTone, string> = {
+  blue: "#4178c7",
+  mint: "#3e9b82",
+  gold: "#c59624",
+  violet: "#8661b8",
+  clay: "#c55b55",
 };
 
-const NODE_OFFSETS = [
-  { x: "46%", y: "48%" },
-  { x: "64%", y: "61%" },
-  { x: "35%", y: "68%" },
-];
+function viewFromHash(hash: string): ViewName | null {
+  const value = hash.slice(1);
+  return value === "graph" || value === "library" || value === "usage" || value === "plugins"
+    ? value
+    : null;
+}
+
 function initialView(): ViewName {
-  const route = window.location.hash.slice(1) as RouteName;
-  if (route === "library" || route === "detail") return "library";
-  if (route === "usage" || route === "activity") return "usage";
-  if (route === "setup") return "setup";
-  return "graph";
+  return viewFromHash(window.location.hash) ?? "graph";
 }
 
 function initialTourOpen(): boolean {
   const params = new URLSearchParams(window.location.search);
   if (params.get("tour") === "1") return true;
   if (window.location.hash) return false;
-  return window.localStorage.getItem("os-atlas-tour-complete") !== "1";
+  return window.localStorage.getItem("skill-atlas-tour-complete") !== "1";
 }
 
-function initialAskOpen(): boolean {
-  return window.location.hash.slice(1) === "ask";
+function providerMessage(code: ProviderErrorCode | string): string {
+  const messages: Partial<Record<ProviderErrorCode, string>> = {
+    "invalid-repository": "Use a repository in owner/name format.",
+    "repository-unavailable": "Repository unavailable or private.",
+    "authentication-required": "Provider authentication is unavailable or no longer valid.",
+    "permission-denied": "The configured repository permission does not allow this action.",
+    "rate-limited": "GitHub rate limit reached. Keep this plugin and try again later.",
+    "provider-timeout": "GitHub did not respond within the bounded read window.",
+    "tree-truncated": "The repository tree is too large to inspect safely.",
+    "too-many-files": "The repository contains more files than this Atlas accepts.",
+    "too-many-skills": "The repository contains more skills than this Atlas accepts.",
+    "skill-too-large": "A skill file is larger than the accepted limit.",
+    "aggregate-too-large": "The skill library is larger than the accepted total limit.",
+    "empty-repository": "No skills/<slug>/SKILL.md files were found.",
+    "invalid-skill": "A skill does not meet the bounded Markdown contract.",
+    "manifest-too-large": "The plugin manifest is larger than the accepted limit.",
+    "invalid-plugin-manifest": "The plugin manifest contains an invalid component declaration.",
+    "stale-source": "The default branch changed. Refresh the plugin before proposing an edit.",
+    "duplicate-branch": "That proposal branch already exists. Start a new proposal.",
+  };
+  return messages[code as ProviderErrorCode] ?? "GitHub could not complete the bounded request.";
 }
 
-function toneClass(tone: AtlasSkill["tone"]): string {
-  return `tone-${tone}`;
+async function responseError(response: Response): Promise<{ code: string; message: string }> {
+  try {
+    const payload = (await response.json()) as {
+      error?: { code?: unknown; message?: unknown };
+    };
+    if (typeof payload.error?.code === "string" && typeof payload.error.message === "string") {
+      return { code: payload.error.code, message: payload.error.message };
+    }
+  } catch {
+    // The stable local fallback below intentionally hides provider response detail.
+  }
+  return { code: "provider-error", message: providerMessage("provider-error") };
 }
 
 function App(): ReactNode {
   const [view, setView] = useState<ViewName>(initialView);
-  const [skills, setSkills] = useState<AtlasSkill[]>(BUNDLED_SKILLS);
-  const [source, setSource] = useState<SourceKind>("bundled");
-  const [sourceWarning, setSourceWarning] = useState<string | undefined>();
-  const [sourceLoading, setSourceLoading] = useState(!STATIC_PUBLIC_DEMO);
-  const [selectedSlug, setSelectedSlug] = useState(BUNDLED_SKILLS[0]?.slug ?? "clarify");
+  const [packs, setPacks] = useState<AtlasPack[]>([EXAMPLE_PACK]);
+  const [activePackId, setActivePackId] = useState(EXAMPLE_PACK.id);
+  const [selectedSlug, setSelectedSlug] = useState(EXAMPLE_PACK.skills[0]?.slug ?? "");
+  const [category, setCategory] = useState("All skills");
   const [libraryQuery, setLibraryQuery] = useState("");
-  const [libraryCategory, setLibraryCategory] = useState("All skills");
-  const [detailTab, setDetailTab] = useState<"read" | "edit">("read");
-  const [fixture, setFixture] = useState<FixtureName>("success");
+  const [readerMode, setReaderMode] = useState<ReaderMode>("rendered");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(initialTourOpen);
   const [tourStep, setTourStep] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [askOpen, setAskOpen] = useState(initialAskOpen);
-  const [askQuery, setAskQuery] = useState("");
-  const [askAnswer, setAskAnswer] = useState<AskAnswer | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [setupChoice, setSetupChoice] = useState("public");
-  const [setupResult, setSetupResult] = useState(false);
+  const [session, setSession] = useState<SessionState>(STATIC_SESSION);
+  const [defaultLoad, setDefaultLoad] = useState<DefaultLoadState>({ status: "loading" });
   const mainRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLButtonElement>(null);
-  const askRef = useRef<HTMLButtonElement>(null);
+  const accountRef = useRef<HTMLButtonElement>(null);
   const tourReturnRef = useRef<HTMLElement | null>(null);
+  const activePackIdRef = useRef(EXAMPLE_PACK.id);
+  const defaultAttemptRef = useRef(0);
 
+  const activePack = useMemo(
+    () => packs.find((pack) => pack.id === activePackId) ?? EXAMPLE_PACK,
+    [activePackId, packs],
+  );
   const selectedSkill = useMemo(
-    () => findSkill(skills, selectedSlug) ?? skills[0] ?? DEFAULT_SKILL,
-    [selectedSlug, skills],
+    () => findSkill(activePack.skills, selectedSlug) ?? activePack.skills[0],
+    [activePack.skills, selectedSlug],
   );
   const filteredSkills = useMemo(
-    () => filterSkills(skills, libraryQuery, libraryCategory),
-    [libraryCategory, libraryQuery, skills],
+    () => filterSkills(activePack.skills, libraryQuery, category),
+    [activePack.skills, category, libraryQuery],
   );
 
   useEffect(() => {
-    if (STATIC_PUBLIC_DEMO) {
-      setSourceLoading(false);
-      return;
-    }
+    const syncViewFromHash = () => {
+      const requested = viewFromHash(window.location.hash);
+      const next = requested ?? "graph";
+      setView(next);
+      setDrawerOpen(false);
+      if (!requested) {
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}#graph`,
+        );
+      }
+    };
+    window.addEventListener("hashchange", syncViewFromHash);
+    syncViewFromHash();
+    return () => window.removeEventListener("hashchange", syncViewFromHash);
+  }, []);
+
+  useEffect(() => {
+    if (STATIC_EDITION) return;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2500);
-    void fetch("/api/skills", { signal: controller.signal })
+    const timer = window.setTimeout(() => controller.abort(), 2500);
+    void fetch("/api/session", { signal: controller.signal })
       .then(async (response) => {
-        if (!response.ok) throw new Error("api-unavailable");
-        const payload: unknown = await response.json();
-        const snapshot = parseSnapshotPayload(payload);
-        if (!snapshot) throw new Error("invalid-api-payload");
-        setSkills(snapshot.skills);
-        setSource(snapshot.source);
-        setSourceWarning(snapshot.warning);
+        if (!response.ok) throw new Error("session-unavailable");
+        const parsed = parseSessionPayload(await response.json());
+        if (!parsed) throw new Error("invalid-session");
+        setSession(parsed);
       })
       .catch(() => {
-        setSource("bundled");
-        setSourceWarning("The live source is unavailable; the bundled snapshot remains ready.");
+        setSession({ ...STATIC_SESSION, mode: "self-hosted" });
       })
-      .finally(() => {
-        window.clearTimeout(timeout);
-        setSourceLoading(false);
-      });
+      .finally(() => window.clearTimeout(timer));
     return () => {
-      window.clearTimeout(timeout);
       controller.abort();
+      window.clearTimeout(timer);
     };
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("tour") !== "1") return;
-    const requested = Number.parseInt(params.get("tourStep") ?? "1", 10);
-    setTourStep(Math.min(TOUR_PAGES.length - 1, Math.max(0, requested - 1)));
-    setTourOpen(true);
+    void loadDefaultPlugin();
+    return () => {
+      defaultAttemptRef.current += 1;
+    };
   }, []);
 
   useEffect(() => {
-    mainRef.current?.focus({ preventScroll: true });
-  }, [view]);
-
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      closeDrawer(true);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [drawerOpen]);
+    const requested = Number.parseInt(
+      new URLSearchParams(window.location.search).get("tourStep") ?? "1",
+      10,
+    );
+    if (new URLSearchParams(window.location.search).get("tour") === "1") {
+      setTourStep(Math.min(TOUR_PAGES.length - 1, Math.max(0, requested - 1)));
+    }
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -249,50 +259,91 @@ function App(): ReactNode {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  function navigate(nextView: RouteName): void {
-    if (nextView === "start") {
-      openTour();
-      return;
-    }
-    if (nextView === "ask") {
-      setAskOpen(true);
-      setDrawerOpen(false);
-      return;
-    }
-    const normalized: ViewName =
-      nextView === "detail" ? "library" : nextView === "activity" ? "usage" : nextView;
-    setView(normalized);
-    window.history.replaceState(null, "", `#${normalized}`);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeDrawer(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [drawerOpen]);
+
+  function navigate(next: ViewName): void {
+    setView(next);
     setDrawerOpen(false);
+    window.history.replaceState(null, "", `#${next}`);
+    window.setTimeout(() => mainRef.current?.focus({ preventScroll: true }), 0);
   }
 
   function openSkill(slug: string): void {
     setSelectedSlug(slug);
-    setDetailTab("read");
-    setView("library");
+    setReaderMode("rendered");
+    setLibraryQuery("");
+    setCategory("All skills");
+    navigate("library");
+  }
+
+  function activatePack(pack: AtlasPack): void {
+    activePackIdRef.current = pack.id;
+    setActivePackId(pack.id);
+    setSelectedSlug(pack.skills[0]?.slug ?? "");
+    setCategory("All skills");
+    setLibraryQuery("");
+    setReaderMode("rendered");
+  }
+
+  async function readRepository(repository: string, publicOnly = false): Promise<AtlasPack> {
+    let pack: AtlasPack;
+    if (STATIC_EDITION) {
+      pack = await readGitHubPack(createGitHubFetchTransport(), repository);
+    } else {
+      const response = await fetch(
+        `/api/packs/import?repository=${encodeURIComponent(repository)}`,
+        { credentials: publicOnly ? "omit" : "same-origin" },
+      );
+      if (!response.ok) {
+        const error = await responseError(response);
+        throw new ProviderError(error.code as ProviderErrorCode);
+      }
+      const parsed = parsePackPayload(await response.json());
+      if (!parsed) throw new ProviderError("provider-payload-invalid");
+      pack = parsed;
+    }
+    return pack;
+  }
+
+  async function loadDefaultPlugin(): Promise<void> {
+    const attempt = defaultAttemptRef.current + 1;
+    defaultAttemptRef.current = attempt;
+    setDefaultLoad({ status: "loading" });
+    const result = await resolveDefaultPlugin((repository) => readRepository(repository, true));
+    if (defaultAttemptRef.current !== attempt) return;
+    if (result.status === "fallback") {
+      setDefaultLoad(result);
+      return;
+    }
+    setPacks((current) => upsertPlugin(current, result.plugin));
+    if (activePackIdRef.current === EXAMPLE_PACK.id) activatePack(result.plugin);
+    setDefaultLoad({ status: "ready" });
+  }
+
+  async function importRepository(repository: string): Promise<AtlasPack> {
+    const pack = await readRepository(repository);
+    defaultAttemptRef.current += 1;
+    setPacks((current) => upsertPlugin(current, pack));
+    activatePack(pack);
+    setDefaultLoad({ status: "ready" });
+    return pack;
+  }
+
+  function closeDrawer(restore = false): void {
     setDrawerOpen(false);
-    window.history.replaceState(null, "", "#library");
-  }
-
-  function closeDrawer(restoreFocus = false): void {
-    setDrawerOpen(false);
-    if (restoreFocus) window.setTimeout(() => menuRef.current?.focus(), 0);
-  }
-
-  function closeSearch(): void {
-    setSearchOpen(false);
-    window.setTimeout(() => searchRef.current?.focus(), 0);
-  }
-
-  function closeAsk(): void {
-    setAskOpen(false);
-    if (window.location.hash === "#ask") window.history.replaceState(null, "", `#${view}`);
-    window.setTimeout(() => askRef.current?.focus(), 0);
+    if (restore) window.setTimeout(() => menuRef.current?.focus(), 0);
   }
 
   function openTour(step = 0): void {
-    const active = document.activeElement;
-    tourReturnRef.current = active instanceof HTMLElement ? active : null;
+    tourReturnRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setTourStep(step);
     setTourOpen(true);
     writeTourUrl(step);
@@ -309,70 +360,61 @@ function App(): ReactNode {
     );
   }
 
-  function clearTourUrl(): void {
+  function closeTour(destination?: ViewName): void {
+    setTourOpen(false);
+    window.localStorage.setItem("skill-atlas-tour-complete", "1");
     const params = new URLSearchParams(window.location.search);
     params.delete("tour");
     params.delete("tourStep");
     const query = params.toString();
+    const nextView = destination ?? view;
     window.history.replaceState(
       null,
       "",
-      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#graph"}`,
+      `${window.location.pathname}${query ? `?${query}` : ""}#${nextView}`,
     );
-  }
-
-  function closeTour(): void {
-    setTourOpen(false);
-    window.localStorage.setItem("os-atlas-tour-complete", "1");
-    const target = tourReturnRef.current;
+    if (destination) {
+      setView(destination);
+      window.setTimeout(() => mainRef.current?.focus({ preventScroll: true }), 0);
+    } else {
+      const target = tourReturnRef.current;
+      window.setTimeout(() => target?.focus(), 0);
+    }
     tourReturnRef.current = null;
-    clearTourUrl();
-    window.setTimeout(() => target?.focus(), 0);
   }
-
-  function finishTour(): void {
-    setTourOpen(false);
-    window.localStorage.setItem("os-atlas-tour-complete", "1");
-    tourReturnRef.current = null;
-    clearTourUrl();
-    navigate("graph");
-    window.setTimeout(() => mainRef.current?.focus({ preventScroll: true }), 0);
-  }
-
-  function runAsk(question = askQuery): void {
-    setAskQuery(question);
-    setAskAnswer(answerQuestion(question, skills));
-  }
-
-  const sourceDetail = source === "local" ? "Mounted checkout" : "Bundled public snapshot";
 
   return (
     <div className="app-shell">
       <Topbar
         view={view}
-        count={skills.length}
-        source={source}
+        session={session}
         menuRef={menuRef}
         searchRef={searchRef}
+        accountRef={accountRef}
         onMenu={() => setDrawerOpen(true)}
         onNavigate={navigate}
         onSearch={() => setSearchOpen(true)}
+        onAccount={() => setAccountOpen(true)}
         onTour={() => openTour()}
-        onSetup={() => navigate("setup")}
       />
       <div className="shell-body">
         <Sidebar
-          skills={skills}
-          source={source}
-          sourceDetail={sourceDetail}
-          category={libraryCategory}
+          pack={activePack}
+          category={category}
           open={drawerOpen}
-          onCategory={(category) => {
-            setLibraryCategory(category);
-            setDrawerOpen(false);
+          view={view}
+          onCategory={(next) => {
+            setCategory(next);
+            setLibraryQuery("");
+            if (next !== "All skills") {
+              const first = activePack.skills.find((skill) => skill.category === next);
+              if (first) setSelectedSlug(first.slug);
+            }
+            if (view === "plugins" || view === "usage") navigate("graph");
+            closeDrawer();
           }}
+          onPlugins={() => navigate("plugins")}
           onClose={() => closeDrawer(true)}
-          onSetup={() => navigate("setup")}
         />
         {drawerOpen ? (
           <button
@@ -382,915 +424,1167 @@ function App(): ReactNode {
           />
         ) : null}
         <main id="main" ref={mainRef} className="product-main" tabIndex={-1}>
-          {sourceWarning ? (
-            <div className="source-warning" role="status">
-              <span>{sourceWarning}</span>
-              <button
-                onClick={() => setSourceWarning(undefined)}
-                aria-label="Dismiss source notice"
-              >
-                ×
-              </button>
-            </div>
-          ) : null}
+          <DefaultLoadStatus state={defaultLoad} onRetry={() => void loadDefaultPlugin()} />
           {view === "graph" ? (
             <GraphView
-              skills={skills}
-              selectedSkill={selectedSkill}
-              category={libraryCategory}
-              sourceLoading={sourceLoading}
+              pack={activePack}
+              category={category}
+              selectedSlug={selectedSkill?.slug ?? ""}
               onSelect={setSelectedSlug}
-              onOpenSkill={openSkill}
+              onOpen={openSkill}
             />
           ) : null}
           {view === "library" ? (
             <LibraryView
-              skills={skills}
+              pack={activePack}
+              session={session}
               query={libraryQuery}
-              category={libraryCategory}
               filteredSkills={filteredSkills}
               selectedSkill={selectedSkill}
-              detailTab={detailTab}
+              readerMode={readerMode}
               onQuery={setLibraryQuery}
-              onCategory={setLibraryCategory}
-              onSelect={setSelectedSlug}
-              onTab={setDetailTab}
-              onOpenSkill={openSkill}
+              onCategory={setCategory}
+              onSelect={(slug) => {
+                setSelectedSlug(slug);
+                setReaderMode("rendered");
+              }}
+              onReaderMode={setReaderMode}
+              onOpenAccount={() => setAccountOpen(true)}
             />
           ) : null}
-          {view === "usage" ? <UsageView skills={skills} /> : null}
-          {view === "setup" ? (
-            <SetupView
-              choice={setupChoice}
-              result={setupResult}
-              fixture={fixture}
-              onChoice={setSetupChoice}
-              onPreview={() => setSetupResult(true)}
-              onFixture={setFixture}
+          {view === "usage" ? <UsageView pack={activePack} /> : null}
+          {view === "plugins" ? (
+            <PluginsView
+              packs={packs}
+              activePack={activePack}
+              session={session}
+              onActivate={activatePack}
+              onImport={importRepository}
+              onOpenAccount={() => setAccountOpen(true)}
             />
           ) : null}
         </main>
       </div>
-      <button
-        ref={askRef}
-        className="ask-fab"
-        aria-haspopup="dialog"
-        onClick={() => setAskOpen(true)}
-      >
-        <span className="ask-status" aria-hidden="true" />
-        Ask the Atlas
-      </button>
       <TourDialog
         open={tourOpen}
         step={tourStep}
-        onStep={(next) => {
-          setTourStep(next);
-          writeTourUrl(next);
+        onStep={(step) => {
+          setTourStep(step);
+          writeTourUrl(step);
         }}
-        onClose={closeTour}
-        onExplore={finishTour}
+        onClose={() => closeTour()}
+        onExample={() => closeTour("graph")}
+        onImport={() => closeTour("plugins")}
       />
       <SearchDialog
         open={searchOpen}
-        skills={skills}
-        onClose={closeSearch}
+        pack={activePack}
+        returnRef={searchRef}
+        onClose={() => setSearchOpen(false)}
         onOpenSkill={(slug) => {
-          closeSearch();
+          setSearchOpen(false);
           openSkill(slug);
         }}
       />
-      <AskDialog
-        open={askOpen}
-        query={askQuery}
-        answer={askAnswer}
-        onQuery={setAskQuery}
-        onAsk={() => runAsk()}
-        onQuestion={runAsk}
-        onOpenSkill={(slug) => {
-          closeAsk();
-          openSkill(slug);
+      <AccountDialog
+        open={accountOpen}
+        session={session}
+        returnRef={accountRef}
+        onClose={() => setAccountOpen(false)}
+        onSession={setSession}
+        onReplay={() => {
+          setAccountOpen(false);
+          openTour();
         }}
-        onClose={closeAsk}
       />
     </div>
   );
-}
-
-interface TopbarProps {
-  view: ViewName;
-  count: number;
-  source: SourceKind;
-  menuRef: RefObject<HTMLButtonElement | null>;
-  searchRef: RefObject<HTMLButtonElement | null>;
-  onMenu: () => void;
-  onNavigate: (view: RouteName) => void;
-  onSearch: () => void;
-  onTour: () => void;
-  onSetup: () => void;
 }
 
 function Topbar({
   view,
-  count,
-  source,
+  session,
   menuRef,
   searchRef,
+  accountRef,
   onMenu,
   onNavigate,
   onSearch,
+  onAccount,
   onTour,
-  onSetup,
-}: TopbarProps): ReactNode {
+}: {
+  view: ViewName;
+  session: SessionState;
+  menuRef: RefObject<HTMLButtonElement | null>;
+  searchRef: RefObject<HTMLButtonElement | null>;
+  accountRef: RefObject<HTMLButtonElement | null>;
+  onMenu: () => void;
+  onNavigate: (view: ViewName) => void;
+  onSearch: () => void;
+  onAccount: () => void;
+  onTour: () => void;
+}): ReactNode {
+  const accountLabel = session.authenticated
+    ? "Admin"
+    : session.mode === "self-hosted" && session.adminAvailable
+      ? "Sign in"
+      : "Public";
   return (
     <header className="topbar">
-      <button
-        ref={menuRef}
-        className="icon-button menu-button"
-        aria-label="Open navigation"
-        onClick={onMenu}
-      >
-        ☰
-      </button>
-      <button className="topbar-brand" onClick={onTour} aria-label="Replay Atlas onboarding">
-        <span className="brand-mark" aria-hidden="true">
-          os
-        </span>
-        <strong>Skills Atlas</strong>
-      </button>
-      <nav className="primary-tabs" aria-label="Primary">
-        {PRIMARY_VIEWS.map((item) => (
-          <button
-            key={item.view}
-            aria-current={view === item.view ? "page" : undefined}
-            onClick={() => onNavigate(item.view)}
+      <div className="brand-cell">
+        <button
+          ref={menuRef}
+          className="icon-button menu-button"
+          onClick={onMenu}
+          aria-label="Open navigation"
+        >
+          <MenuIcon />
+        </button>
+        <button
+          className="product-name"
+          onClick={onTour}
+          aria-label="Replay Skill Atlas onboarding"
+        >
+          Skill Atlas
+        </button>
+      </div>
+      <div className="topbar-main">
+        <nav className="primary-tabs" aria-label="Primary">
+          {PRIMARY_VIEWS.map((item) => (
+            <button
+              key={item.view}
+              aria-current={view === item.view ? "page" : undefined}
+              onClick={() => onNavigate(item.view)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <span className="topbar-spacer" />
+        <button
+          ref={searchRef}
+          className="search-trigger"
+          onClick={onSearch}
+          aria-haspopup="dialog"
+          aria-label="Search skills"
+        >
+          <SearchIcon />
+          <span>Search</span>
+          <kbd>⌘ K</kbd>
+        </button>
+      </div>
+      <div className="topbar-actions">
+        <a
+          className="github-link"
+          href="https://github.com/onlinesourdough/Skills-Atlas"
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label="View Skills Atlas source on GitHub"
+          title="View Skills Atlas source on GitHub"
+        >
+          <GitHubIcon />
+        </a>
+        <button
+          ref={accountRef}
+          className="account-trigger"
+          onClick={onAccount}
+          aria-haspopup="dialog"
+        >
+          <span
+            className={`avatar${session.authenticated ? " authenticated" : ""}`}
+            aria-hidden="true"
           >
-            {item.label}
-          </button>
-        ))}
-      </nav>
-      <span className="topbar-spacer" />
-      <button className="source-trigger" onClick={onSetup}>
-        <span className={`source-dot${source === "local" ? " local" : ""}`} />
-        {source === "local" ? "Local source" : "Public source"}
-      </button>
-      <span className="skill-count">{count} skills</span>
-      <button
-        ref={searchRef}
-        className="search-trigger"
-        onClick={onSearch}
-        aria-haspopup="dialog"
-        aria-label="Search skills"
-      >
-        <span aria-hidden="true">⌕</span>
-        <span>Search skills</span>
-        <kbd>⌘ K</kbd>
-      </button>
-      <span className="avatar" aria-label="Online Sourdough public preview">
-        OS
-      </span>
+            {session.authenticated ? "A" : "P"}
+          </span>
+          <span>{accountLabel}</span>
+        </button>
+      </div>
     </header>
   );
 }
 
-interface SidebarProps {
-  skills: AtlasSkill[];
-  source: SourceKind;
-  sourceDetail: string;
-  category: string;
-  open: boolean;
-  onCategory: (category: string) => void;
-  onClose: () => void;
-  onSetup: () => void;
-}
-
-function Sidebar({
-  skills,
-  source,
-  sourceDetail,
-  category,
-  open,
-  onCategory,
-  onClose,
-  onSetup,
-}: SidebarProps): ReactNode {
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 820px)").matches);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 820px)");
-    const syncMobileState = () => setIsMobile(mediaQuery.matches);
-    mediaQuery.addEventListener("change", syncMobileState);
-    return () => mediaQuery.removeEventListener("change", syncMobileState);
-  }, []);
-
-  const closedMobile = isMobile && !open;
-  const categories = categoriesForSkills(skills);
-  const counts = new Map<string, number>();
-  for (const skill of skills) counts.set(skill.category, (counts.get(skill.category) ?? 0) + 1);
-
-  return (
-    <aside
-      className={`rail${open ? " rail-open" : ""}`}
-      aria-label="Atlas taxonomy"
-      aria-hidden={closedMobile ? true : undefined}
-      inert={closedMobile}
-    >
-      <div className="rail-mobile-head">
-        <span className="label">Atlas filters</span>
-        <button className="icon-button rail-close" aria-label="Close navigation" onClick={onClose}>
-          ×
-        </button>
-      </div>
-      <section className="taxonomy-section" aria-labelledby="departments-title">
-        <h2 id="departments-title" className="rail-heading">
-          Departments
-        </h2>
-        <button
-          className="taxonomy-item all-skills"
-          aria-pressed={category === "All skills"}
-          onClick={() => onCategory("All skills")}
-        >
-          <span>All skills</span>
-          <small>{skills.length}</small>
-        </button>
-        {categories.slice(1).map((item, index) => (
-          <button
-            className="taxonomy-item"
-            key={item}
-            aria-pressed={category === item}
-            onClick={() => onCategory(item)}
-          >
-            <i className={`taxonomy-dot category-${index + 1}`} aria-hidden="true" />
-            <span>{item}</span>
-            <small>{counts.get(item) ?? 0}</small>
-          </button>
-        ))}
-      </section>
-      <section className="taxonomy-section packs" aria-labelledby="packs-title">
-        <h2 id="packs-title" className="rail-heading">
-          Source groups · read only
-        </h2>
-        <button className="taxonomy-item source-group" onClick={() => onCategory("All skills")}>
-          <i className="source-ring" aria-hidden="true" />
-          <span>Public snapshot</span>
-          <small>{skills.length}</small>
-        </button>
-        <button className="taxonomy-item source-group" onClick={onSetup}>
-          <i className="source-ring" aria-hidden="true" />
-          <span>{source === "local" ? "Mounted checkout" : "Local checkout"}</span>
-          <small>{source === "local" ? skills.length : "—"}</small>
-        </button>
-      </section>
-      <div className="rail-key">
-        <span>
-          <i className="relation-key connected" /> related
-        </span>
-        <span>
-          <i className="relation-key faint" /> indirect
-        </span>
-      </div>
-      <button className="rail-source" onClick={onSetup}>
-        <span className="label">Current source</span>
-        <strong>{sourceDetail}</strong>
-        <small>Git canonical · read only</small>
-      </button>
-    </aside>
-  );
-}
-
-function GraphView({
-  skills,
-  selectedSkill,
-  category,
-  sourceLoading,
-  onSelect,
-  onOpenSkill,
+function DefaultLoadStatus({
+  state,
+  onRetry,
 }: {
-  skills: AtlasSkill[];
-  selectedSkill: AtlasSkill;
-  category: string;
-  sourceLoading: boolean;
-  onSelect: (slug: string) => void;
-  onOpenSkill: (slug: string) => void;
+  state: DefaultLoadState;
+  onRetry: () => void;
 }): ReactNode {
+  if (state.status === "ready") return null;
+  const message =
+    state.status === "loading"
+      ? "Loading live skills from GitHub…"
+      : state.code === "rate-limited"
+        ? "GitHub’s read limit was reached. Showing Offline example."
+        : "Live skills are unavailable. Showing Offline example.";
   return (
-    <section className="graph-view" aria-labelledby="graph-title">
-      <div className="surface-heading">
-        <div>
-          <p className="eyebrow">Relationship map · public read</p>
-          <h1 id="graph-title">Skills connect into a working system.</h1>
-        </div>
-        <p>
-          {sourceLoading
-            ? "Checking configured source…"
-            : "Select a node to inspect its safe record."}
-        </p>
-      </div>
-      <RelationMap
-        skills={skills}
-        selectedSlug={selectedSkill.slug}
-        category={category}
-        onSelect={onSelect}
-      />
-      <SkillPreview skill={selectedSkill} onOpen={onOpenSkill} />
-    </section>
-  );
-}
-
-function RelationMap({
-  skills,
-  selectedSlug,
-  category,
-  onSelect,
-}: {
-  skills: AtlasSkill[];
-  selectedSlug: string;
-  category: string;
-  onSelect: (slug: string) => void;
-}): ReactNode {
-  const categories = categoriesForSkills(skills)
-    .slice(1)
-    .filter((categoryName) => skills.some((skill) => skill.category === categoryName));
-  return (
-    <div className="relation-map" aria-label="Selectable clustered skill relation graph">
-      <svg
-        className="cluster-links"
-        viewBox="0 0 1000 680"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <path d="M490 160 C380 230 300 280 205 300" />
-        <path d="M520 160 C630 220 710 260 780 300" />
-        <path d="M480 205 C460 330 410 410 390 520" />
-        <path d="M540 205 C590 330 660 420 695 530" />
-        <path d="M225 345 C330 430 510 500 680 545" />
-        <path d="M760 350 C650 430 540 475 405 520" />
-      </svg>
-      {categories.map((categoryName) => {
-        const layout = CATEGORY_LAYOUT[categoryName] ?? CATEGORY_LAYOUT["Team practice"]!;
-        const categorySkills = skills.filter((skill) => skill.category === categoryName);
-        const muted = category !== "All skills" && category !== categoryName;
-        const style = {
-          "--cluster-x": layout.x,
-          "--cluster-y": layout.y,
-          "--cluster-size": layout.size,
-        } as CSSProperties;
-        return (
-          <div
-            className={`skill-cluster ${toneClass(layout.tone)}${muted ? " is-muted" : ""}`}
-            style={style}
-            key={categoryName}
-            role="group"
-            aria-label={`${categoryName}, ${categorySkills.length} skills`}
-          >
-            <span className="cluster-label">
-              {categoryName} <small>{categorySkills.length}</small>
-            </span>
-            <span className="satellite satellite-a" aria-hidden="true" />
-            <span className="satellite satellite-b" aria-hidden="true" />
-            <span className="satellite satellite-c" aria-hidden="true" />
-            {categorySkills.map((skill, index) => {
-              const position = NODE_OFFSETS[index] ?? NODE_OFFSETS[0]!;
-              const nodeStyle = {
-                "--node-x": position.x,
-                "--node-y": position.y,
-              } as CSSProperties;
-              return (
-                <button
-                  className="cluster-node"
-                  style={nodeStyle}
-                  key={skill.slug}
-                  aria-pressed={selectedSlug === skill.slug}
-                  aria-label={`${skill.name}, ${skill.category}`}
-                  onClick={() => onSelect(skill.slug)}
-                >
-                  <i aria-hidden="true" />
-                  <span>{skill.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        );
-      })}
-      <p className="graph-caption">
-        Decorative satellite nodes show library density, not customer records.
-      </p>
+    <div className={`default-load-status ${state.status}`} role="status" aria-live="polite">
+      <span>
+        {state.status === "loading" ? <LoadingIcon /> : <AttentionIcon />}
+        {message}
+      </span>
+      {state.status === "fallback" ? <button onClick={onRetry}>Retry</button> : null}
     </div>
   );
 }
 
-function SkillPreview({
-  skill,
-  onOpen,
+function Sidebar({
+  pack,
+  category,
+  open,
+  view,
+  onCategory,
+  onPlugins,
+  onClose,
 }: {
-  skill: AtlasSkill;
-  onOpen: (slug: string) => void;
+  pack: AtlasPack;
+  category: string;
+  open: boolean;
+  view: ViewName;
+  onCategory: (category: string) => void;
+  onPlugins: () => void;
+  onClose: () => void;
 }): ReactNode {
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 820px)").matches);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 820px)");
+    const update = () => setMobile(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  const categories = categoriesForSkills(pack.skills);
+  const counts = new Map<string, number>();
+  for (const skill of pack.skills)
+    counts.set(skill.category, (counts.get(skill.category) ?? 0) + 1);
+  const categoryTones = new Map<string, GraphTone>();
+  for (const skill of pack.skills)
+    if (!categoryTones.has(skill.category)) categoryTones.set(skill.category, skill.tone);
   return (
-    <aside className="skill-preview" aria-live="polite">
-      <div className="preview-title">
-        <i className={`preview-dot ${toneClass(skill.tone)}`} aria-hidden="true" />
-        <div>
-          <span className="label">Selected skill</span>
-          <h2>{skill.name}</h2>
-        </div>
-        <span className="version-pill">{skill.version}</span>
+    <aside
+      className={`taxonomy-rail${open ? " open" : ""}`}
+      aria-label="Skill taxonomy"
+      aria-hidden={mobile && !open ? true : undefined}
+      inert={mobile && !open}
+    >
+      <div className="rail-mobile-head">
+        <strong>Browse</strong>
+        <button className="icon-button" onClick={onClose} aria-label="Close navigation">
+          <CloseIcon />
+        </button>
       </div>
-      <p>{skill.description}</p>
-      <code>{skill.sourcePath}</code>
-      <div className="preview-relations">
-        {skill.relations.slice(0, 3).map((relation) => (
-          <span key={relation}>{relation}</span>
+      <section aria-labelledby="categories-title">
+        <h2 id="categories-title" className="rail-label">
+          Categories
+        </h2>
+        {categories.map((item, index) => (
+          <button
+            key={item}
+            className="taxonomy-item"
+            aria-pressed={category === item}
+            onClick={() => onCategory(item)}
+          >
+            {index > 0 ? (
+              <i
+                className="taxonomy-dot"
+                style={
+                  {
+                    "--dot": TONE_COLORS[categoryTones.get(item) ?? "blue"],
+                  } as CSSProperties
+                }
+                aria-hidden="true"
+              />
+            ) : null}
+            <span>{item}</span>
+            <small>{index === 0 ? pack.skills.length : (counts.get(item) ?? 0)}</small>
+          </button>
         ))}
-      </div>
-      <button className="text-button" onClick={() => onOpen(skill.slug)}>
-        Inspect in Library <span aria-hidden="true">→</span>
-      </button>
+      </section>
+      <section className="rail-pack" aria-labelledby="plugin-title">
+        <h2 id="plugin-title" className="rail-label">
+          Plugin
+        </h2>
+        <button
+          className="pack-rail-button"
+          aria-current={view === "plugins" ? "page" : undefined}
+          onClick={onPlugins}
+        >
+          <span className="repo-glyph" aria-hidden="true">
+            <RepoIcon />
+          </span>
+          <span>
+            <strong>{pack.repository}</strong>
+            <small>Manage plugins</small>
+          </span>
+        </button>
+      </section>
     </aside>
   );
 }
 
-function LibraryView({
-  skills,
-  query,
+interface GraphNodeLayout {
+  skill: AtlasSkill;
+  x: number;
+  y: number;
+}
+
+interface GraphCategoryLayout {
+  category: string;
+  tone: GraphTone;
+  x: number;
+  y: number;
+  radius: number;
+  nodes: GraphNodeLayout[];
+}
+
+function graphLayout(skills: AtlasSkill[]): GraphCategoryLayout[] {
+  const grouped = new Map<string, AtlasSkill[]>();
+  for (const skill of skills)
+    grouped.set(skill.category, [...(grouped.get(skill.category) ?? []), skill]);
+  const categories = [...grouped.entries()];
+  const centers = [
+    { x: 470, y: 190 },
+    { x: 250, y: 350 },
+    { x: 690, y: 350 },
+    { x: 350, y: 555 },
+    { x: 595, y: 555 },
+    { x: 470, y: 380 },
+  ];
+  if (categories.length === 1) centers[0] = { x: 470, y: 365 };
+  if (categories.length === 2) {
+    centers[0] = { x: 320, y: 360 };
+    centers[1] = { x: 620, y: 360 };
+  }
+  return categories.map(([name, group], categoryIndex) => {
+    const center = centers[categoryIndex % centers.length] ?? { x: 470, y: 365 };
+    const radius = Math.max(76, 54 + Math.sqrt(group.length) * 34);
+    const nodes = group.map((skill, index) => {
+      const nodeRadius =
+        group.length === 1
+          ? 0
+          : group.length >= 5
+            ? Math.min(radius - 35, 95)
+            : Math.min(radius - 30, 28 + group.length * 5);
+      const angle = (Math.PI * 2 * index) / group.length - Math.PI / 2;
+      return {
+        skill,
+        x: center.x + Math.cos(angle) * nodeRadius,
+        y: center.y + Math.sin(angle) * nodeRadius,
+      };
+    });
+    return {
+      category: name,
+      tone: group[0]?.tone ?? "blue",
+      x: center.x,
+      y: center.y,
+      radius,
+      nodes,
+    };
+  });
+}
+
+function graphNodeLabel(name: string): string[] {
+  const words = name.trim().split(/\s+/u);
+  if (words.length < 2) return words;
+  const split = Math.ceil(words.length / 2);
+  return [words.slice(0, split).join(" "), words.slice(split).join(" ")];
+}
+
+function GraphView({
+  pack,
   category,
+  selectedSlug,
+  onSelect,
+  onOpen,
+}: {
+  pack: AtlasPack;
+  category: string;
+  selectedSlug: string;
+  onSelect: (slug: string) => void;
+  onOpen: (slug: string) => void;
+}): ReactNode {
+  const emphasis = useMemo(
+    () =>
+      new Map(
+        graphCategoryEmphasis(pack.skills, category).map((item) => [item.slug, item.emphasized]),
+      ),
+    [category, pack.skills],
+  );
+  const layout = useMemo(() => graphLayout(pack.skills), [pack.skills]);
+  const nodes = layout.flatMap((item) => item.nodes);
+  const nodeBySlug = new Map(nodes.map((node) => [node.skill.slug, node]));
+  const edges = useMemo(() => relationEdges(pack.skills), [pack.skills]);
+  const selected = findSkill(pack.skills, selectedSlug) ?? pack.skills[0];
+  const connected = new Set<string>(selected?.relations ?? []);
+  for (const skill of pack.skills)
+    if (skill.relations.includes(selected?.slug ?? "")) connected.add(skill.slug);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const drag = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
+
+  function startPan(event: ReactPointerEvent<SVGSVGElement>): void {
+    if ((event.target as Element).closest("[data-skill-node]")) return;
+    drag.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      originX: pan.x,
+      originY: pan.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function movePan(event: ReactPointerEvent<SVGSVGElement>): void {
+    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+    setPan({
+      x: drag.current.originX + (event.clientX - drag.current.x) / zoom,
+      y: drag.current.originY + (event.clientY - drag.current.y) / zoom,
+    });
+  }
+
+  function stopPan(event: ReactPointerEvent<SVGSVGElement>): void {
+    if (drag.current?.pointerId === event.pointerId) drag.current = null;
+  }
+
+  return (
+    <section className="graph-view" aria-labelledby="graph-title">
+      <header className="view-heading graph-heading">
+        <h1 id="graph-title">Skill relationships</h1>
+        <span>
+          {pack.skills.length} skills · {relationCount(pack.skills)} connections
+        </span>
+      </header>
+      <div className="graph-stage">
+        <div className="graph-controls" aria-label="Graph controls">
+          <button
+            onClick={() => setZoom((value) => Math.min(1.8, value + 0.15))}
+            aria-label="Zoom in"
+          >
+            +
+          </button>
+          <button
+            onClick={() => setZoom((value) => Math.max(0.65, value - 0.15))}
+            aria-label="Zoom out"
+          >
+            −
+          </button>
+          <button
+            onClick={() => {
+              setZoom(1);
+              setPan({ x: 0, y: 0 });
+            }}
+          >
+            Reset
+          </button>
+        </div>
+        {pack.skills.length ? (
+          <svg
+            className="relationship-graph"
+            viewBox="0 0 940 720"
+            role="img"
+            aria-labelledby="graph-svg-title graph-svg-description"
+            onPointerDown={startPan}
+            onPointerMove={movePan}
+            onPointerUp={stopPan}
+            onPointerCancel={stopPan}
+          >
+            <title id="graph-svg-title">Relationship graph for {pack.repository}</title>
+            <desc id="graph-svg-description">
+              Only loaded skills and explicit source relations are shown. Drag to pan and use the
+              controls to zoom.
+            </desc>
+            <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
+              {layout.map((cluster) => (
+                <g
+                  key={cluster.category}
+                  className={`graph-cluster${
+                    category !== "All skills" && cluster.category !== category
+                      ? " category-muted"
+                      : " category-emphasized"
+                  }`}
+                >
+                  <circle
+                    cx={cluster.x}
+                    cy={cluster.y}
+                    r={cluster.radius}
+                    fill={TONE_COLORS[cluster.tone]}
+                  />
+                  <text x={cluster.x} y={cluster.y - cluster.radius - 14} textAnchor="middle">
+                    {cluster.category} · {cluster.nodes.length}
+                  </text>
+                </g>
+              ))}
+              {edges.map((edge) => {
+                const start = nodeBySlug.get(edge.startSlug);
+                const end = nodeBySlug.get(edge.endSlug);
+                if (!start || !end) return null;
+                const active =
+                  selected && (edge.startSlug === selected.slug || edge.endSlug === selected.slug);
+                const categoryMuted =
+                  category !== "All skills" &&
+                  !emphasis.get(edge.startSlug) &&
+                  !emphasis.get(edge.endSlug);
+                return (
+                  <line
+                    key={`${edge.startSlug}-${edge.endSlug}`}
+                    className={`graph-edge${active ? " active" : ""}${
+                      categoryMuted ? " category-muted" : " category-emphasized"
+                    }`}
+                    x1={start.x}
+                    y1={start.y}
+                    x2={end.x}
+                    y2={end.y}
+                  />
+                );
+              })}
+              {nodes.map((node) => {
+                const active = node.skill.slug === selected?.slug;
+                const related = connected.has(node.skill.slug);
+                const categoryMuted = !emphasis.get(node.skill.slug);
+                return (
+                  <g
+                    key={node.skill.slug}
+                    data-skill-node="true"
+                    className={`skill-node${active ? " selected" : ""}${related ? " related" : ""}${
+                      categoryMuted ? " category-muted" : " category-emphasized"
+                    }`}
+                    transform={`translate(${node.x} ${node.y})`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${node.skill.name}, ${node.skill.relations.length} outgoing relations`}
+                    onClick={() => onSelect(node.skill.slug)}
+                    onDoubleClick={() => onOpen(node.skill.slug)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onSelect(node.skill.slug);
+                      }
+                    }}
+                  >
+                    <circle r={active ? 12 : 9} fill={TONE_COLORS[node.skill.tone]} />
+                    <text textAnchor="middle">
+                      {graphNodeLabel(node.skill.name).map((line, index) => (
+                        <tspan key={line} x="0" y={24 + index * 10}>
+                          {line}
+                        </tspan>
+                      ))}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          </svg>
+        ) : (
+          <EmptyState
+            title="No loaded skills"
+            detail="Import a plugin with valid skill files to build the graph."
+          />
+        )}
+        <div className="mobile-relationship-list" aria-label="Skill relationship list">
+          {pack.skills.map((skill) => (
+            <button
+              key={skill.slug}
+              className={emphasis.get(skill.slug) ? "category-emphasized" : "category-muted"}
+              onClick={() => onOpen(skill.slug)}
+            >
+              <i style={{ "--node": TONE_COLORS[skill.tone] } as CSSProperties} />
+              <span>
+                <strong>{skill.name}</strong>
+                <small>
+                  {skill.relations.length
+                    ? `Links to ${skill.relations.join(", ")}`
+                    : "No explicit relations"}
+                </small>
+              </span>
+              <ArrowIcon />
+            </button>
+          ))}
+        </div>
+        {selected ? (
+          <div className="graph-selection" aria-live="polite">
+            <i style={{ "--node": TONE_COLORS[selected.tone] } as CSSProperties} />
+            <span>
+              <strong>{selected.name}</strong>
+              <small>
+                {connected.size ? `${connected.size} connected skills` : "No explicit relations"}
+              </small>
+            </span>
+            <button onClick={() => onOpen(selected.slug)}>
+              Open in Library <ArrowIcon />
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function LibraryView({
+  pack,
+  session,
+  query,
   filteredSkills,
   selectedSkill,
-  detailTab,
+  readerMode,
   onQuery,
   onCategory,
   onSelect,
-  onTab,
-  onOpenSkill,
+  onReaderMode,
+  onOpenAccount,
 }: {
-  skills: AtlasSkill[];
+  pack: AtlasPack;
+  session: SessionState;
   query: string;
-  category: string;
   filteredSkills: AtlasSkill[];
-  selectedSkill: AtlasSkill;
-  detailTab: "read" | "edit";
+  selectedSkill: AtlasSkill | undefined;
+  readerMode: ReaderMode;
   onQuery: (query: string) => void;
   onCategory: (category: string) => void;
   onSelect: (slug: string) => void;
-  onTab: (tab: "read" | "edit") => void;
-  onOpenSkill: (slug: string) => void;
+  onReaderMode: (mode: ReaderMode) => void;
+  onOpenAccount: () => void;
 }): ReactNode {
   return (
-    <section className="library-workspace" aria-labelledby="library-title">
-      <div className="library-pane">
-        <header className="library-head">
-          <div>
-            <p className="eyebrow">Library · public snapshot</p>
-            <h1 id="library-title">{category}</h1>
-          </div>
-          <span>
-            {filteredSkills.length} of {skills.length}
-          </span>
-        </header>
-        <div className="library-controls">
-          <label className="search-field" htmlFor="library-search">
-            <span aria-hidden="true">⌕</span>
+    <section className="library-view" aria-labelledby="library-title">
+      <div className="library-index">
+        <header className="library-toolbar">
+          <h1 id="library-title">Library</h1>
+          <label className="inline-search">
+            <SearchIcon />
+            <span className="sr-only">Filter the skill library</span>
             <input
-              id="library-search"
               value={query}
               onChange={(event) => onQuery(event.target.value)}
-              placeholder="Search skills"
+              placeholder="Filter skills"
             />
           </label>
-          <label className="select-field" htmlFor="library-category">
-            <span className="sr-only">Department</span>
-            <select
-              id="library-category"
-              value={category}
-              onChange={(event) => onCategory(event.target.value)}
-            >
-              {categoriesForSkills(skills).map((option) => (
-                <option key={option}>{option}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="library-list" aria-live="polite">
+        </header>
+        <div className="skill-list">
           {filteredSkills.length ? (
             filteredSkills.map((skill) => (
               <button
-                className={`skill-list-row${selectedSkill.slug === skill.slug ? " is-selected" : ""}`}
                 key={skill.slug}
-                aria-pressed={selectedSkill.slug === skill.slug}
-                onClick={() => {
-                  onSelect(skill.slug);
-                  onTab("read");
-                }}
+                className={selectedSkill?.slug === skill.slug ? "selected" : ""}
+                onClick={() => onSelect(skill.slug)}
               >
-                <span className="row-title">
-                  <i className={`row-dot ${toneClass(skill.tone)}`} aria-hidden="true" />
+                <i style={{ "--node": TONE_COLORS[skill.tone] } as CSSProperties} />
+                <span>
                   <strong>{skill.name}</strong>
-                  <small>{skill.usage} demo refs</small>
+                  <small>{skill.description}</small>
                 </span>
-                <span className="row-summary">{skill.description}</span>
-                <code>{skill.sourcePath}</code>
               </button>
             ))
           ) : (
-            <div className="empty-state">
-              <strong>No skill matches that filter.</strong>
-              <p>Try a wider term or return to the complete bundled shelf.</p>
-              <button
-                className="button"
-                onClick={() => {
-                  onQuery("");
-                  onCategory("All skills");
-                }}
-              >
-                Reset library
-              </button>
-            </div>
+            <EmptyState
+              title="No matching skills"
+              detail="Clear the text or category filter to return to this plugin."
+              action="Clear filters"
+              onAction={() => {
+                onQuery("");
+                onCategory("All skills");
+              }}
+            />
           )}
         </div>
       </div>
-      <SkillDetailPane
+      <SkillReader
+        pack={pack}
         skill={selectedSkill}
-        tab={detailTab}
-        onTab={onTab}
-        onOpenSkill={onOpenSkill}
+        session={session}
+        mode={readerMode}
+        onMode={onReaderMode}
+        onSelectRelation={onSelect}
+        onOpenAccount={onOpenAccount}
       />
     </section>
   );
 }
 
-function SkillDetailPane({
+function markdownBody(markdown: string): string {
+  return markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/u, "").trim();
+}
+
+function SkillReader({
+  pack,
   skill,
-  tab,
-  onTab,
-  onOpenSkill,
+  session,
+  mode,
+  onMode,
+  onSelectRelation,
+  onOpenAccount,
 }: {
-  skill: AtlasSkill;
-  tab: "read" | "edit";
-  onTab: (tab: "read" | "edit") => void;
-  onOpenSkill: (slug: string) => void;
+  pack: AtlasPack;
+  skill: AtlasSkill | undefined;
+  session: SessionState;
+  mode: ReaderMode;
+  onMode: (mode: ReaderMode) => void;
+  onSelectRelation: (slug: string) => void;
+  onOpenAccount: () => void;
 }): ReactNode {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [proposalState, setProposalState] = useState<"idle" | "saving" | "success" | "error">(
+    "idle",
+  );
+  const [proposalError, setProposalError] = useState("");
+  const [proposalResult, setProposalResult] = useState<ProposalResult | null>(null);
+
+  useEffect(() => {
+    setEditing(false);
+    setDraft(skill?.markdown ?? "");
+    setProposalState("idle");
+    setProposalError("");
+    setProposalResult(null);
+  }, [skill?.slug, skill?.markdown]);
+
+  if (!skill) {
+    return (
+      <aside className="skill-reader empty-reader">
+        <EmptyState
+          title="Choose a skill"
+          detail="Select a library row to read its complete Markdown."
+        />
+      </aside>
+    );
+  }
+
+  const canEdit = pack.source === "github" && pack.access === "write" && session.authenticated;
+
+  async function submitProposal(): Promise<void> {
+    try {
+      parseSkillMarkdown(draft, skill!.slug);
+    } catch {
+      setProposalState("error");
+      setProposalError(
+        "Keep valid frontmatter, the matching skill name, and a non-empty Markdown body.",
+      );
+      return;
+    }
+    setProposalState("saving");
+    setProposalError("");
+    try {
+      const response = await fetch("/api/proposals", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          repository: pack.repository,
+          path: skill!.sourcePath,
+          baseSha: pack.revision,
+          content: draft,
+          title: `Update ${skill!.slug} from Skill Atlas`,
+          proposalId: crypto.randomUUID(),
+        }),
+      });
+      if (!response.ok) {
+        const error = await responseError(response);
+        throw new Error(error.message);
+      }
+      const parsed = parseProposalResult(await response.json());
+      if (!parsed) throw new Error("The proposal response was invalid.");
+      setProposalResult(parsed);
+      setProposalState("success");
+      setEditing(false);
+    } catch (error) {
+      setProposalState("error");
+      setProposalError(error instanceof Error ? error.message : providerMessage("provider-error"));
+    }
+  }
+
   return (
-    <aside className="detail-pane" aria-labelledby="skill-detail-title">
-      <header className="detail-pane-head">
+    <aside className="skill-reader" aria-labelledby="skill-reader-title">
+      <header className="reader-head">
         <div>
-          <p className="eyebrow">Skill record · public read</p>
-          <h2 id="skill-detail-title">{skill.name}</h2>
+          <div className="reader-title-row">
+            <i style={{ "--node": TONE_COLORS[skill.tone] } as CSSProperties} />
+            <h2 id="skill-reader-title">{skill.name}</h2>
+          </div>
           <p>
-            {skill.category} · {skill.slug}
+            {skill.category} <span>·</span> {skill.slug}
           </p>
         </div>
-        <button className="button compact" onClick={() => onTab(tab === "read" ? "edit" : "read")}>
-          {tab === "read" ? "Edit shape" : "Cancel"}
-        </button>
+        {canEdit ? (
+          <button
+            className="button secondary compact"
+            onClick={() => {
+              setEditing(true);
+              setDraft(skill.markdown);
+              setProposalState("idle");
+            }}
+          >
+            <EditIcon /> Propose edit
+          </button>
+        ) : pack.access === "write" && !session.authenticated ? (
+          <button className="button secondary compact" onClick={onOpenAccount}>
+            Sign in to edit
+          </button>
+        ) : (
+          <span className="reader-access">
+            <LockIcon /> Read only
+          </span>
+        )}
       </header>
-      <div className="detail-meta">
-        <span>{skill.version}</span>
-        <code>{skill.sourcePath}</code>
-      </div>
-      {tab === "read" ? (
-        <div className="detail-copy">
-          <p className="detail-lede">{skill.description}</p>
-          <h3>Safe excerpt</h3>
-          <p>{skill.excerpt}</p>
-          <blockquote>
-            This preview is deliberately short. Follow the source path for the canonical skill.
-          </blockquote>
-          <h3>Frontmatter shape</h3>
-          <pre>{`---\nname: ${skill.slug}\ndescription: ${skill.description}\n---`}</pre>
-          <h3>Related skills</h3>
-          <div className="detail-relations">
-            {skill.relations.map((relation) => (
-              <button key={relation} onClick={() => onOpenSkill(relation)}>
-                {relation} →
-              </button>
-            ))}
-          </div>
+      <details className="reader-source">
+        <summary>
+          <RepoIcon />
+          <span>
+            {pack.repository} · <code>{skill.sourcePath}</code>
+          </span>
+          <small>{pack.access === "write" ? "Can edit" : "Read only"}</small>
+          <i aria-hidden="true">
+            <ArrowIcon />
+          </i>
+        </summary>
+        <div>
+          <span>
+            Default branch <code>{pack.defaultBranch}</code>
+          </span>
+          <span>
+            Revision <code>{pack.revision.slice(0, 12)}</code>
+          </span>
         </div>
+      </details>
+      {skill.relations.length ? (
+        <nav className="reader-relations" aria-label="Related skills">
+          <span>Related</span>
+          {skill.relations.map((slug) => (
+            <button key={slug} onClick={() => onSelectRelation(slug)}>
+              {slug}
+            </button>
+          ))}
+        </nav>
       ) : (
-        <div className="detail-copy edit-shape">
-          <div className="permission" role="status">
-            <strong>Editing is denied in the public Atlas.</strong>
-            <p>Git remains canonical. This surface performs no write or provider action.</p>
+        <p className="no-relations">No related skills declared.</p>
+      )}
+      {editing ? (
+        <div className="editor-pane">
+          <div className="editor-message">
+            <strong>Propose through GitHub</strong>
+            <p>
+              Atlas validates the full source, creates a branch, and opens a pull request. The
+              default branch is never written directly.
+            </p>
           </div>
-          <label htmlFor="skill-editor">Read-only editor preview</label>
-          <textarea
-            id="skill-editor"
-            value={`---\nname: ${skill.slug}\ndescription: ${skill.description}\n---\n\n${skill.excerpt}`}
-            readOnly
-            rows={16}
-          />
+          <label>
+            <span>Complete Markdown source</span>
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              spellCheck={false}
+            />
+          </label>
+          {proposalState === "error" ? (
+            <p className="inline-error" role="alert">
+              {proposalError}
+            </p>
+          ) : null}
           <div className="editor-actions">
-            <span>Permission required</span>
-            <button className="button primary" disabled>
-              Save to Git
+            <button
+              className="button secondary"
+              onClick={() => {
+                setEditing(false);
+                setProposalState("idle");
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              className="button primary"
+              disabled={proposalState === "saving"}
+              onClick={() => void submitProposal()}
+            >
+              {proposalState === "saving" ? "Creating proposal…" : "Create branch & pull request"}
             </button>
           </div>
         </div>
+      ) : (
+        <>
+          <div className="reader-tabs" role="tablist" aria-label="Skill content">
+            <button
+              role="tab"
+              aria-selected={mode === "rendered"}
+              onClick={() => onMode("rendered")}
+            >
+              Rendered
+            </button>
+            <button role="tab" aria-selected={mode === "source"} onClick={() => onMode("source")}>
+              Full source
+            </button>
+          </div>
+          <div className="reader-scroll">
+            {proposalState === "success" && proposalResult ? (
+              <div className="proposal-success" role="status">
+                <SuccessIcon />
+                <span>
+                  <strong>Pull request #{proposalResult.pullRequestNumber} opened</strong>
+                  <small>Branch {proposalResult.branch}</small>
+                </span>
+                <a href={proposalResult.pullRequestUrl} target="_blank" rel="noreferrer">
+                  Review on GitHub <ExternalIcon />
+                </a>
+              </div>
+            ) : null}
+            {mode === "rendered" ? (
+              <article className="markdown-body">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  skipHtml
+                  components={{
+                    a: ({ href, children }) => {
+                      const external = href?.startsWith("https://") || href?.startsWith("http://");
+                      return (
+                        <a
+                          href={href}
+                          {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+                        >
+                          {children}
+                        </a>
+                      );
+                    },
+                    img: ({ alt }) => (
+                      <span className="markdown-image-note" role="note">
+                        Image omitted{alt ? `: ${alt}` : ""}
+                      </span>
+                    ),
+                  }}
+                >
+                  {markdownBody(skill.markdown)}
+                </ReactMarkdown>
+              </article>
+            ) : (
+              <pre className="source-code">
+                <code>{skill.markdown}</code>
+              </pre>
+            )}
+          </div>
+        </>
       )}
-      <footer className="detail-foot">
-        {skill.usage} demo references · {skill.relations.length} relations · write denied
-      </footer>
     </aside>
   );
 }
 
-function UsageView({ skills }: { skills: AtlasSkill[] }): ReactNode {
-  const ranked = [...skills].sort((left, right) => right.usage - left.usage);
-  const maximum = ranked[0]?.usage ?? 1;
-  const total = skills.reduce((sum, skill) => sum + skill.usage, 0);
-  const quiet = ranked.filter((skill) => skill.usage <= 18);
-  const events = [
-    ["09:42", "Proof loop opened from Graph", "Bundled fixture · not a Git write"],
-    ["09:18", "Source audit inspected", "Public snapshot · read only"],
-    ["Yesterday", "Route models related", "Demo activity · no model call"],
-  ];
+function UsageView({ pack }: { pack: AtlasPack }): ReactNode {
+  const signals = repositoryHealth(pack.skills);
   return (
     <section className="usage-view" aria-labelledby="usage-title">
-      <header className="usage-head">
-        <div>
-          <p className="eyebrow">Demo fixture · not live telemetry</p>
-          <h1 id="usage-title">Usage</h1>
-        </div>
-        <span className="demo-badge">DEMO DATA</span>
+      <header className="usage-heading">
+        <h1 id="usage-title">Usage & health</h1>
+        <p>
+          {pack.repository} · {pack.snapshotLabel}
+        </p>
       </header>
-      <div className="usage-metrics">
-        <div>
-          <strong>{total}</strong>
-          <span>fixture references</span>
+      <section className="usage-empty" aria-labelledby="usage-empty-title">
+        <div className="empty-icon">
+          <PulseIcon />
         </div>
         <div>
-          <strong>{skills.length}</strong>
-          <span>skills represented</span>
-        </div>
-        <div>
-          <strong>0</strong>
-          <span>telemetry writes</span>
-        </div>
-      </div>
-      <p className="usage-note">Deterministic bundled numbers for reviewing the product shape.</p>
-      <section className="ranked-usage" aria-labelledby="most-used-title">
-        <h2 id="most-used-title">Most used</h2>
-        <ol>
-          {ranked.map((skill, index) => (
-            <li key={skill.slug}>
-              <span className="rank">{index + 1}</span>
-              <strong>{skill.name}</strong>
-              <span className="usage-bar" aria-hidden="true">
-                <i
-                  className={toneClass(skill.tone)}
-                  style={{ width: `${Math.max(8, Math.round((skill.usage / maximum) * 100))}%` }}
-                />
-              </span>
-              <span>{skill.usage}</span>
-              <small>fixture</small>
-            </li>
-          ))}
-        </ol>
-      </section>
-      <section className="quiet-skills" aria-labelledby="quiet-title">
-        <h2 id="quiet-title">
-          Quiet <span>{quiet.length}</span>
-        </h2>
-        <p>Lower-frequency demo records. No pruning recommendation is implied.</p>
-        <div>
-          {quiet.map((skill) => (
-            <span key={skill.slug}>
-              <i className={toneClass(skill.tone)} /> {skill.slug}
-            </span>
-          ))}
-        </div>
-      </section>
-      <details className="activity-log">
-        <summary>
-          Activity fixture <span>NOT LIVE</span>
-        </summary>
-        <ol>
-          {events.map(([time, title, detail]) => (
-            <li key={`${time}-${title}`}>
-              <time>{time}</time>
-              <div>
-                <strong>{title}</strong>
-                <p>{detail}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </details>
-    </section>
-  );
-}
-
-function SetupView({
-  choice,
-  result,
-  fixture,
-  onChoice,
-  onPreview,
-  onFixture,
-}: {
-  choice: string;
-  result: boolean;
-  fixture: FixtureName;
-  onChoice: (choice: string) => void;
-  onPreview: () => void;
-  onFixture: (fixture: FixtureName) => void;
-}): ReactNode {
-  return (
-    <section className="setup-view" aria-labelledby="setup-title">
-      <header className="setup-head">
-        <div>
-          <p className="eyebrow">Source and distribution</p>
-          <h1 id="setup-title">Keep the path honest.</h1>
-          <p>Choose the public static Atlas or one operator-controlled Node read path.</p>
-        </div>
-        <span className="permission-badge">READ ONLY</span>
-      </header>
-      <div className="setup-grid">
-        <section className="setup-card" aria-labelledby="source-choice-title">
-          <h2 id="source-choice-title">Source mode</h2>
-          <fieldset>
-            <legend className="sr-only">Choose a source mode</legend>
-            <label className="option-card">
-              <input
-                type="radio"
-                name="source"
-                checked={choice === "public"}
-                onChange={() => onChoice("public")}
-              />
-              <span>
-                <strong>Bundled public snapshot</strong>
-                <small>Static-safe · no API required</small>
-              </span>
-            </label>
-            <label className="option-card">
-              <input
-                type="radio"
-                name="source"
-                checked={choice === "local"}
-                onChange={() => onChoice("local")}
-              />
-              <span>
-                <strong>Mounted local checkout</strong>
-                <small>Node only · SKILLS_REPO_PATH</small>
-              </span>
-            </label>
-            <label className="option-card">
-              <input
-                type="radio"
-                name="source"
-                checked={choice === "token"}
-                onChange={() => onChoice("token")}
-              />
-              <span>
-                <strong>Provider token</strong>
-                <small>Not implemented · no OAuth action</small>
-              </span>
-            </label>
-          </fieldset>
-          <button className="button primary" onClick={onPreview}>
-            Preview safe connection
-          </button>
-          {result ? (
-            <div className="setup-result" role="status">
-              <strong>
-                {choice === "public" ? "Public snapshot ready." : "No connection was made."}
-              </strong>
-              <p>
-                {choice === "public"
-                  ? "The packaged snapshot is the normal static source."
-                  : choice === "local"
-                    ? "Set the documented server environment locally; this browser action does not mount files."
-                    : "Provider access is outside this Build; no provider action was taken."}
-              </p>
-            </div>
-          ) : null}
-        </section>
-        <section className="setup-card capability-card" aria-labelledby="capability-title">
-          <h2 id="capability-title">Capability boundary</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Capability</th>
-                <th>Static public</th>
-                <th>Node self-host</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Bundled graph, library, Ask</td>
-                <td>Yes</td>
-                <td>Yes</td>
-              </tr>
-              <tr>
-                <td>Mounted Git checkout</td>
-                <td>—</td>
-                <td>Read only</td>
-              </tr>
-              <tr>
-                <td>Health endpoint</td>
-                <td>—</td>
-                <td>
-                  <code>/api/health</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Git writes / OAuth / telemetry</td>
-                <td>No</td>
-                <td>No</td>
-              </tr>
-            </tbody>
-          </table>
-          <div className="command-block">
-            <span>Static review build</span>
-            <code>npm run build:static</code>
-            <span>Node self-host</span>
-            <code>SKILLS_REPO_PATH=/checkout npm run boot</code>
-          </div>
-        </section>
-        <section className="setup-card distribution-card" aria-labelledby="distribution-title">
-          <h2 id="distribution-title">Harness distribution</h2>
+          <h2 id="usage-empty-title">Usage data isn’t connected.</h2>
           <p>
-            The Atlas explains distribution; it does not install skills. Use the canonical Skills
-            repository’s pinned project-local command and verify the source revision separately.
+            This Atlas has not received team activity events. It will not invent totals, people,
+            last-used dates, or “never used” claims.
           </p>
-          <code>npx skills@1.5.23 add onlinesourdough/Skills#v0.1.0 …</code>
-          <ul>
-            <li>Repository remains canonical</li>
-            <li>Public client receives no credential</li>
-            <li>Updates and rollback stay explicit</li>
-          </ul>
-        </section>
-      </div>
-      <StateFixtures active={fixture} onSelect={onFixture} />
-    </section>
-  );
-}
-
-function StateFixtures({
-  active,
-  onSelect,
-}: {
-  active: FixtureName;
-  onSelect: (fixture: FixtureName) => void;
-}): ReactNode {
-  const names = Object.keys(FIXTURE_COPY) as FixtureName[];
-  const copy = FIXTURE_COPY[active];
-  return (
-    <section className="state-fixtures" aria-labelledby="states-title">
-      <header>
-        <div>
-          <p className="eyebrow">Review fixtures</p>
-          <h2 id="states-title">Required interface states</h2>
         </div>
-        <p>Deterministic review controls, not customer telemetry.</p>
-      </header>
-      <div className="fixture-tabs" aria-label="State fixtures">
-        {names.map((name) => (
-          <button key={name} aria-pressed={active === name} onClick={() => onSelect(name)}>
-            {name}
-          </button>
-        ))}
-      </div>
-      <div className={`fixture-output fixture-${active}`} role="status" aria-live="polite">
-        <b aria-hidden="true">{copy.icon}</b>
-        <span>
-          <strong>{copy.title}</strong>
-          <small>{copy.detail}</small>
-        </span>
-        <em>{copy.action}</em>
-      </div>
+      </section>
+      <section className="health-section" aria-labelledby="health-title">
+        <header>
+          <div>
+            <h2 id="health-title">Repository health</h2>
+            <p>{pack.skills.length} loaded skill files · source-backed signals only</p>
+          </div>
+        </header>
+        <div className="health-list">
+          {signals.map((signal) => (
+            <div key={signal.id} className={`health-row ${signal.severity}`}>
+              <i aria-hidden="true">
+                {signal.severity === "good" ? <SuccessIcon /> : <AttentionIcon />}
+              </i>
+              <span>
+                <strong>{signal.label}</strong>
+                <small>{signal.detail}</small>
+              </span>
+              <em>{signal.count}</em>
+            </div>
+          ))}
+        </div>
+      </section>
+      <p className="health-summary">
+        {relationCount(pack.skills)} explicit connections. Graph and health use only relations
+        declared or referenced by the loaded source.
+      </p>
     </section>
   );
 }
 
-function useDialogFocusTrap(
-  dialogRef: React.RefObject<HTMLDialogElement | null>,
-  open: boolean,
-): void {
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return;
-      const focusable = Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          "button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex='-1'])",
-        ),
-      );
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-    dialog.addEventListener("keydown", onKeyDown);
-    return () => dialog.removeEventListener("keydown", onKeyDown);
-  }, [dialogRef, open]);
+function PluginsView({
+  packs,
+  activePack,
+  session,
+  onActivate,
+  onImport,
+  onOpenAccount,
+}: {
+  packs: AtlasPack[];
+  activePack: AtlasPack;
+  session: SessionState;
+  onActivate: (pack: AtlasPack) => void;
+  onImport: (repository: string) => Promise<AtlasPack>;
+  onOpenAccount: () => void;
+}): ReactNode {
+  const [repository, setRepository] = useState("");
+  const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [message, setMessage] = useState("");
+
+  async function submit(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    setState("loading");
+    setMessage("");
+    try {
+      const pack = await onImport(repository.trim());
+      setState("success");
+      setMessage(`${pack.repository} imported with ${pack.skills.length} skills.`);
+      setRepository("");
+    } catch (error) {
+      const code = error instanceof ProviderError ? error.code : "provider-error";
+      setState("error");
+      setMessage(providerMessage(code));
+    }
+  }
+
+  return (
+    <section className="packs-view" aria-labelledby="plugins-title">
+      <header className="packs-heading">
+        <h1 id="plugins-title">Plugins</h1>
+        {session.mode === "self-hosted" && session.adminAvailable && !session.authenticated ? (
+          <button className="button secondary" onClick={onOpenAccount}>
+            <LockIcon /> Admin sign in
+          </button>
+        ) : null}
+      </header>
+      <div className="plugin-guide">
+        <RepoIcon />
+        <p>
+          <strong>A plugin is a Git-backed collection.</strong> It includes skills and may declare
+          apps or MCP servers. Atlas shows only what the repository declares. Access determines Read
+          only or Can edit; edits create a branch and pull request.
+        </p>
+      </div>
+      <section className="import-panel" aria-labelledby="import-title">
+        <div className="import-copy">
+          <h2 id="import-title">Import from GitHub</h2>
+          <p>
+            Public repositories work without a credential. Private repositories require self-hosted
+            admin access.
+          </p>
+        </div>
+        <form onSubmit={(event) => void submit(event)}>
+          <label>
+            <span className="sr-only">GitHub repository</span>
+            <input
+              value={repository}
+              onChange={(event) => setRepository(event.target.value)}
+              placeholder="owner/repository"
+              autoCapitalize="none"
+              spellCheck={false}
+            />
+          </label>
+          <button className="button primary" disabled={state === "loading"}>
+            {state === "loading" ? "Importing…" : "Import repository"}
+          </button>
+        </form>
+        {state === "error" ? (
+          <div className="import-result error" role="alert">
+            <AttentionIcon />
+            <span>
+              <strong>Import failed</strong>
+              <small>{message}</small>
+            </span>
+          </div>
+        ) : null}
+        {state === "success" ? (
+          <div className="import-result success" role="status">
+            <SuccessIcon />
+            <span>
+              <strong>Plugin ready</strong>
+              <small>{message}</small>
+            </span>
+          </div>
+        ) : null}
+        <footer>
+          <span>
+            <LockIcon /> Credentials are never requested or stored by the public UI.
+          </span>
+        </footer>
+      </section>
+      <section className="pack-list-section" aria-labelledby="connected-plugins-title">
+        <header>
+          <h2 id="connected-plugins-title">Your plugins</h2>
+          <p>Imports remain in this browser session. GitHub stays canonical.</p>
+        </header>
+        <div className="pack-list">
+          {packs.map((pack) => {
+            const active = pack.id === activePack.id;
+            const declaredExtensions = pluginComponentLabels(pack).filter(
+              (component) => component !== "Skills",
+            );
+            return (
+              <article key={pack.id} className={active ? "active" : ""}>
+                <div className="pack-identity">
+                  <span className="pack-icon">
+                    <RepoIcon />
+                  </span>
+                  <div>
+                    <h3>{pack.repository}</h3>
+                    <p>
+                      {pack.source === "example"
+                        ? "Built-in fictional demo · available offline · not repository data"
+                        : pack.repositoryUrl}
+                    </p>
+                  </div>
+                </div>
+                <p className="plugin-meta">
+                  <span>{pack.skills.length} skills</span>
+                  {declaredExtensions.map((component) => (
+                    <span key={component}>{component}</span>
+                  ))}
+                  {pack.source === "github" ? <code>{pack.revision.slice(0, 12)}</code> : null}
+                  <span className={pack.access === "write" ? "can-edit" : "read-only"}>
+                    {pack.access === "write" ? <EditIcon /> : <LockIcon />}
+                    {pack.access === "write" ? "Can edit" : "Read only"}
+                  </span>
+                </p>
+                <div className="pack-actions">
+                  {active ? (
+                    <span className="active-pack">
+                      <SuccessIcon /> In use
+                    </span>
+                  ) : (
+                    <button className="button secondary compact" onClick={() => onActivate(pack)}>
+                      Use plugin
+                    </button>
+                  )}
+                  {pack.repositoryUrl ? (
+                    <a
+                      href={pack.repositoryUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Open ${pack.repository} on GitHub`}
+                    >
+                      <ExternalIcon />
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </section>
+  );
 }
 
 function TourDialog({
@@ -1298,33 +1592,27 @@ function TourDialog({
   step,
   onStep,
   onClose,
-  onExplore,
+  onExample,
+  onImport,
 }: {
   open: boolean;
   step: number;
   onStep: (step: number) => void;
   onClose: () => void;
-  onExplore: () => void;
+  onExample: () => void;
+  onImport: () => void;
 }): ReactNode {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const ref = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  useDialogFocusTrap(dialogRef, open);
-  const page = TOUR_PAGES[step] ?? TOUR_PAGES[0];
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
+  useDialog(ref, open);
+  useFocusTrap(ref, open);
   useEffect(() => {
     if (open) window.requestAnimationFrame(() => headingRef.current?.focus());
   }, [open, step]);
-
+  const page = TOUR_PAGES[step] ?? TOUR_PAGES[0];
   return (
     <dialog
-      ref={dialogRef}
+      ref={ref}
       className="tour-dialog"
       aria-labelledby="tour-title"
       aria-describedby="tour-description"
@@ -1333,325 +1621,615 @@ function TourDialog({
         onClose();
       }}
     >
-      <div className="tour-shell">
-        <button className="tour-skip" onClick={onClose}>
-          Skip tour
-        </button>
-        <div className="tour-progress-row">
-          <p aria-live="polite">
-            Step {step + 1} of {TOUR_PAGES.length}
-          </p>
-          <ol className="tour-track" aria-label="Tour progress">
-            {TOUR_PAGES.map((item, index) => (
-              <li
-                key={item.label}
-                aria-current={index === step ? "step" : undefined}
-                className={index <= step ? "complete" : ""}
-              />
-            ))}
-          </ol>
-        </div>
-        <TourArt step={step} />
-        <div className="tour-copy">
-          <p className="eyebrow">{page.kicker}</p>
-          <h2 ref={headingRef} id="tour-title" tabIndex={-1}>
-            {page.title}
-          </h2>
-          <p id="tour-description">{page.description}</p>
-          <small>{page.detail}</small>
-        </div>
-        <footer className="tour-footer">
-          {step > 0 ? (
+      <div className="tour-layout">
+        <section className="tour-card">
+          <button className="tour-skip" onClick={onClose}>
+            Skip
+          </button>
+          <AtlasMark />
+          <div className="tour-copy">
+            <p>{page.eyebrow}</p>
+            <h2 ref={headingRef} tabIndex={-1} id="tour-title">
+              {page.title}
+            </h2>
+            <p id="tour-description">{page.description}</p>
+          </div>
+          <TourArt step={step} />
+          <small className="tour-note">{page.note}</small>
+          <footer className="tour-actions">
             <button
               className="round-button"
-              aria-label="Previous tour page"
               onClick={() => onStep(step - 1)}
+              aria-label="Previous step"
+              disabled={step === 0}
             >
-              ←
+              <BackIcon />
             </button>
-          ) : (
-            <span />
-          )}
-          {step < TOUR_PAGES.length - 1 ? (
-            <button className="button primary" onClick={() => onStep(step + 1)}>
-              Next <span aria-hidden="true">→</span>
-            </button>
-          ) : (
-            <button className="button primary" onClick={onExplore}>
-              Enter the public Atlas <span aria-hidden="true">→</span>
-            </button>
-          )}
-        </footer>
+            <ol aria-label="Onboarding progress">
+              {TOUR_PAGES.map((item, index) => (
+                <li key={item.eyebrow}>
+                  <button
+                    aria-label={`Onboarding step ${index + 1}`}
+                    aria-current={index === step ? "step" : undefined}
+                    onClick={() => onStep(index)}
+                  />
+                </li>
+              ))}
+            </ol>
+            {step < TOUR_PAGES.length - 1 ? (
+              <button className="button primary tour-next" onClick={() => onStep(step + 1)}>
+                Next <ArrowIcon />
+              </button>
+            ) : (
+              <span className="tour-end-marker" aria-hidden="true" />
+            )}
+          </footer>
+          {step === TOUR_PAGES.length - 1 ? (
+            <div className="tour-final-actions">
+              <button className="button secondary" onClick={onExample}>
+                Explore Atlas
+              </button>
+              <button className="button primary" onClick={onImport}>
+                Import repository <ArrowIcon />
+              </button>
+            </div>
+          ) : null}
+        </section>
       </div>
     </dialog>
   );
 }
 
+function AtlasMark(): ReactNode {
+  return (
+    <span className="atlas-mark" aria-hidden="true">
+      {Array.from({ length: 7 }, (_, index) => (
+        <i key={index} />
+      ))}
+    </span>
+  );
+}
+
 function TourArt({ step }: { step: number }): ReactNode {
+  if (step === 0)
+    return (
+      <div className="tour-art scattered" aria-hidden="true">
+        <span>
+          <LaptopIcon />
+          <small>Laptop</small>
+        </span>
+        <span>
+          <FolderIcon />
+          <small>Project</small>
+        </span>
+        <span>
+          <BotIcon />
+          <small>Agent</small>
+        </span>
+        <i />
+        <i />
+      </div>
+    );
   if (step === 1)
     return (
-      <div className="tour-art scattered-art" aria-hidden="true">
-        <div>
-          <strong>Laptop</strong>
-          <i />
-          <i />
-        </div>
-        <div>
-          <strong>Agent folder</strong>
-          <i />
-          <i />
-        </div>
-        <div>
-          <strong>Project notes</strong>
-          <i />
-          <i />
-        </div>
+      <div className="tour-art isolated" aria-hidden="true">
+        <span>
+          <FileIcon />
+          <small>Version A</small>
+        </span>
+        <b>×</b>
+        <span>
+          <FileIcon />
+          <small>Version B</small>
+        </span>
+        <b>×</b>
+        <span>
+          <FileIcon />
+          <small>Version C</small>
+        </span>
       </div>
     );
   if (step === 2)
     return (
-      <div className="tour-art edits-art" aria-hidden="true">
-        <span>
-          local A <i>×</i>
+      <div className="tour-art shared" aria-hidden="true">
+        <span className="center-repo">
+          <RepoIcon />
+          <small>Shared Git library</small>
         </span>
-        <span className="tour-repo">
-          Git
-          <br />
-          <small>canonical</small>
-        </span>
-        <span>
-          local B <i>×</i>
-        </span>
+        {[0, 1, 2, 3].map((item) => (
+          <i key={item} />
+        ))}
+        {[0, 1, 2, 3].map((item) => (
+          <b key={item}>
+            <PersonIcon />
+          </b>
+        ))}
       </div>
     );
   if (step === 3)
     return (
-      <div className="tour-art shared-art" aria-hidden="true">
-        <span className="tour-repo">
-          OS
-          <br />
-          <small>shared shelf</small>
-        </span>
-        <i />
-        <i />
-        <i />
-        <i />
-        <i />
-      </div>
-    );
-  if (step === 4)
-    return (
-      <div className="tour-art latest-art" aria-hidden="true">
-        <span className="tour-repo">
-          v0.1
-          <br />
-          <small>reviewed</small>
-        </span>
-        <div className="people">
-          <i>F</i>
-          <i>O</i>
-          <i>A</i>
-          <i>S</i>
+      <div className="tour-art inspect" aria-hidden="true">
+        <div>
+          <span />
+          <span />
+          <span />
         </div>
+        <aside>
+          <strong>Skill</strong>
+          <i />
+          <i />
+          <i />
+          <small>Propose edit</small>
+        </aside>
       </div>
     );
   return (
-    <div className="tour-art intro-art" aria-hidden="true">
-      <span className="intro-orbit">
-        <i />
-        <i />
-        <i />
-        <i />
-        <i />
+    <div className="tour-art distributed" aria-hidden="true">
+      <span className="center-repo">
+        <SuccessIcon />
+        <small>Reviewed</small>
       </span>
-      <span className="tour-repo">
-        os
-        <br />
-        <small>skills atlas</small>
-      </span>
+      {[0, 1, 2, 3].map((item) => (
+        <b key={item}>
+          <PersonIcon />
+          <i>✓</i>
+        </b>
+      ))}
     </div>
   );
 }
 
 function SearchDialog({
   open,
-  skills,
+  pack,
+  returnRef,
   onClose,
   onOpenSkill,
 }: {
   open: boolean;
-  skills: AtlasSkill[];
+  pack: AtlasPack;
+  returnRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
   onOpenSkill: (slug: string) => void;
 }): ReactNode {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const ref = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
-  useDialogFocusTrap(dialogRef, open);
-
+  useDialog(ref, open);
+  useFocusTrap(ref, open);
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
     if (open) window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
-
-  const results = filterSkills(skills, query, "All skills").slice(0, 6);
+  const results = filterSkills(pack.skills, query, "All skills").slice(0, 8);
+  function close(): void {
+    onClose();
+    window.setTimeout(() => returnRef.current?.focus(), 0);
+  }
   return (
     <dialog
-      ref={dialogRef}
+      ref={ref}
       className="search-dialog"
       aria-labelledby="search-title"
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        close();
       }}
     >
-      <div className="dialog-head">
+      <header>
+        <SearchIcon />
         <div>
-          <span className="label">Global search</span>
-          <h2 id="search-title">Find a skill or source path.</h2>
+          <h2 id="search-title">Search {pack.repository}</h2>
+          <p>Names, descriptions, paths, and complete Markdown</p>
         </div>
-        <button className="icon-button" aria-label="Close search" onClick={onClose}>
-          ×
+        <button className="icon-button" onClick={close} aria-label="Close search">
+          <CloseIcon />
         </button>
-      </div>
-      <input
-        ref={inputRef}
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search the public Atlas"
-        aria-label="Search skills"
-      />
-      {query ? (
-        <div className="search-results" aria-live="polite">
-          {results.length ? (
-            results.map((skill) => (
-              <button key={skill.slug} onClick={() => onOpenSkill(skill.slug)}>
+      </header>
+      <label>
+        <span className="sr-only">Search active skill plugin</span>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search skills"
+        />
+      </label>
+      <div className="search-results" aria-live="polite">
+        {query && results.length === 0 ? (
+          <EmptyState title="No matching skills" detail="Try a name, phrase, or skills/ path." />
+        ) : (
+          results.map((skill) => (
+            <button key={skill.slug} onClick={() => onOpenSkill(skill.slug)}>
+              <i style={{ "--node": TONE_COLORS[skill.tone] } as CSSProperties} />
+              <span>
                 <strong>{skill.name}</strong>
-                <span>{skill.sourcePath}</span>
-              </button>
-            ))
-          ) : (
-            <p className="empty-search">No result. Try a skill name or `skills/` path.</p>
-          )}
-        </div>
-      ) : (
-        <p className="search-hint">Search names, descriptions, departments, and source paths.</p>
-      )}
-      <p className="dialog-foot">
-        <kbd>Esc</kbd> closes · <kbd>⌘ K</kbd> opens anywhere
-      </p>
+                <small>{skill.sourcePath}</small>
+              </span>
+              <ArrowIcon />
+            </button>
+          ))
+        )}
+      </div>
+      <footer>
+        <kbd>Esc</kbd> closes <span>·</span> <kbd>⌘ K</kbd> opens anywhere
+      </footer>
     </dialog>
   );
 }
 
-function AskDialog({
+function AccountDialog({
   open,
-  query,
-  answer,
-  onQuery,
-  onAsk,
-  onQuestion,
-  onOpenSkill,
+  session,
+  returnRef,
   onClose,
+  onSession,
+  onReplay,
 }: {
   open: boolean;
-  query: string;
-  answer: AskAnswer | null;
-  onQuery: (query: string) => void;
-  onAsk: () => void;
-  onQuestion: (question: string) => void;
-  onOpenSkill: (slug: string) => void;
+  session: SessionState;
+  returnRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
+  onSession: (session: SessionState) => void;
+  onReplay: () => void;
 }): ReactNode {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const ref = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  useDialogFocusTrap(dialogRef, open);
-
+  const [password, setPassword] = useState("");
+  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+  useDialog(ref, open);
+  useFocusTrap(ref, open);
   useEffect(() => {
-    const dialog = dialogRef.current;
+    if (open && session.adminAvailable && !session.authenticated)
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    if (!open) {
+      setPassword("");
+      setState("idle");
+    }
+  }, [open, session.adminAvailable, session.authenticated]);
+  function close(): void {
+    onClose();
+    window.setTimeout(() => returnRef.current?.focus(), 0);
+  }
+  async function login(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    setState("loading");
+    try {
+      const response = await fetch("/api/session/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!response.ok) throw new Error("denied");
+      const parsed = parseSessionPayload(await response.json());
+      if (!parsed) throw new Error("invalid");
+      onSession(parsed);
+      setPassword("");
+      setState("idle");
+    } catch {
+      setState("error");
+    }
+  }
+  async function logout(): Promise<void> {
+    const response = await fetch("/api/session", { method: "DELETE", credentials: "same-origin" });
+    const parsed = response.ok ? parseSessionPayload(await response.json()) : null;
+    if (parsed) onSession(parsed);
+  }
+  const title = session.authenticated
+    ? "Self-hosted admin"
+    : session.mode === "static"
+      ? "Public static edition"
+      : session.adminAvailable
+        ? "Admin sign in"
+        : "Public self-hosted edition";
+  return (
+    <dialog
+      ref={ref}
+      className="account-dialog"
+      aria-labelledby="account-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
+    >
+      <header>
+        <span className={`large-avatar${session.authenticated ? " authenticated" : ""}`}>
+          {session.authenticated ? "A" : "P"}
+        </span>
+        <div>
+          <h2 id="account-title">{title}</h2>
+          <p>
+            {session.authenticated
+              ? "Private reads and verified provider permissions are available."
+              : "No GitHub identity is claimed."}
+          </p>
+        </div>
+        <button className="icon-button" onClick={close} aria-label="Close account">
+          <CloseIcon />
+        </button>
+      </header>
+      <div className="account-status-list">
+        <div>
+          <span>Atlas session</span>
+          <strong>{session.authenticated ? "Authenticated" : "Public"}</strong>
+        </div>
+        <div>
+          <span>GitHub provider</span>
+          <strong>
+            {session.providerAvailable
+              ? "Server configured"
+              : session.mode === "static"
+                ? "Public reads only"
+                : "Not configured"}
+          </strong>
+        </div>
+        <div>
+          <span>Session storage</span>
+          <strong>{session.mode === "static" ? "None" : "Memory only"}</strong>
+        </div>
+      </div>
+      {session.adminAvailable && !session.authenticated ? (
+        <form className="account-login" onSubmit={(event) => void login(event)}>
+          <label>
+            <span>Admin password</span>
+            <input
+              ref={inputRef}
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+            />
+          </label>
+          {state === "error" ? <p role="alert">Sign-in was not accepted.</p> : null}
+          <button className="button primary" disabled={state === "loading"}>
+            {state === "loading" ? "Signing in…" : "Sign in"}
+          </button>
+          <small>
+            The password is sent only to this self-hosted Node process and is never stored in the
+            browser.
+          </small>
+        </form>
+      ) : null}
+      <footer>
+        {session.authenticated ? (
+          <button className="button secondary" onClick={() => void logout()}>
+            Sign out
+          </button>
+        ) : (
+          <button className="button secondary" onClick={onReplay}>
+            Replay onboarding
+          </button>
+        )}
+      </footer>
+    </dialog>
+  );
+}
+
+function EmptyState({
+  title,
+  detail,
+  action,
+  onAction,
+}: {
+  title: string;
+  detail: string;
+  action?: string;
+  onAction?: () => void;
+}): ReactNode {
+  return (
+    <div className="empty-state">
+      <span>
+        <EmptyIcon />
+      </span>
+      <strong>{title}</strong>
+      <p>{detail}</p>
+      {action && onAction ? <button onClick={onAction}>{action}</button> : null}
+    </div>
+  );
+}
+
+function useDialog(ref: RefObject<HTMLDialogElement | null>, open: boolean): void {
+  useEffect(() => {
+    const dialog = ref.current;
     if (!dialog) return;
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
-    if (open) window.setTimeout(() => inputRef.current?.focus(), 0);
-  }, [open]);
+  }, [open, ref]);
+}
 
-  const questions = [
-    "Where is the canonical Git source?",
-    "How do I share the reviewed version?",
-    "What does route models do?",
-  ];
-
-  return (
-    <dialog
-      ref={dialogRef}
-      className="ask-dialog"
-      aria-labelledby="ask-title"
-      onCancel={(event) => {
+function useFocusTrap(ref: RefObject<HTMLDialogElement | null>, open: boolean): void {
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog || !open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const focusable = [
+        ...dialog.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
+        ),
+      ];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
-        onClose();
-      }}
-    >
-      <header className="ask-head">
-        <div>
-          <span className="ask-status" aria-hidden="true" />
-          <h2 id="ask-title">Ask the Atlas</h2>
-          <small>Bundled answers · runtime AI off</small>
-        </div>
-        <button className="icon-button" aria-label="Close Ask the Atlas" onClick={onClose}>
-          ×
-        </button>
-      </header>
-      <div className="ask-body">
-        {answer ? (
-          <div className="ask-answer" aria-live="polite">
-            <span className="label">Bundled answer · {answer.matched ? "matched" : "broaden"}</span>
-            <h3>{answer.title}</h3>
-            <p>{answer.body}</p>
-            <div>
-              {answer.related.map((slug) => (
-                <button key={slug} onClick={() => onOpenSkill(slug)}>
-                  {slug} →
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="ask-empty">
-            <strong>Ask where a skill lives or how it connects.</strong>
-            <p>The answer is generated deterministically from the packaged index.</p>
-            <div>
-              {questions.map((question) => (
-                <button key={question} onClick={() => onQuestion(question)}>
-                  {question}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      <form
-        className="ask-form"
-        onSubmit={(event: FormEvent) => {
-          event.preventDefault();
-          onAsk();
-        }}
-      >
-        <input
-          ref={inputRef}
-          id="ask-input"
-          value={query}
-          onChange={(event) => onQuery(event.target.value)}
-          placeholder="Which skill should I use for…"
-          aria-label="Ask the Atlas question"
-        />
-        <button type="submit" aria-label="Ask bundled index">
-          →
-        </button>
-      </form>
-    </dialog>
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    dialog.addEventListener("keydown", onKeyDown);
+    return () => dialog.removeEventListener("keydown", onKeyDown);
+  }, [open, ref]);
+}
+
+function Icon({
+  children,
+  viewBox = "0 0 24 24",
+}: {
+  children: ReactNode;
+  viewBox?: string;
+}): ReactNode {
+  return (
+    <svg viewBox={viewBox} aria-hidden="true" focusable="false">
+      {children}
+    </svg>
+  );
+}
+function MenuIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </Icon>
+  );
+}
+function CloseIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="m6 6 12 12M18 6 6 18" />
+    </Icon>
+  );
+}
+function SearchIcon(): ReactNode {
+  return (
+    <Icon>
+      <circle cx="11" cy="11" r="6" />
+      <path d="m16 16 4 4" />
+    </Icon>
+  );
+}
+function ArrowIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M5 12h14m-5-5 5 5-5 5" />
+    </Icon>
+  );
+}
+function BackIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M19 12H5m5 5-5-5 5-5" />
+    </Icon>
+  );
+}
+function RepoIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M6 3h10a2 2 0 0 1 2 2v16H7a3 3 0 0 1-3-3V5a2 2 0 0 1 2-2Z" />
+      <path d="M7 17h11M8 7h6M8 11h7" />
+    </Icon>
+  );
+}
+function LockIcon(): ReactNode {
+  return (
+    <Icon>
+      <rect x="5" y="10" width="14" height="10" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </Icon>
+  );
+}
+function EditIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="m4 20 4.2-1 10.6-10.6a2 2 0 0 0-2.8-2.8L5.4 16.2 4 20Z" />
+      <path d="m14.5 7 2.8 2.8" />
+    </Icon>
+  );
+}
+function ExternalIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M14 4h6v6M20 4l-9 9" />
+      <path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6" />
+    </Icon>
+  );
+}
+function SuccessIcon(): ReactNode {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8 12 3 3 5-6" />
+    </Icon>
+  );
+}
+function AttentionIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M12 3 2.8 20h18.4L12 3Z" />
+      <path d="M12 9v5m0 3h.01" />
+    </Icon>
+  );
+}
+function LoadingIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M20 12a8 8 0 1 1-2.3-5.7" />
+    </Icon>
+  );
+}
+function GitHubIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        className="github-mark"
+        d="M12 2.3a10 10 0 0 0-3.16 19.49c.5.1.68-.22.68-.48v-1.87c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.81a9.5 9.5 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.86v3.06c0 .27.18.59.69.49A10 10 0 0 0 12 2.3Z"
+      />
+    </svg>
+  );
+}
+function PulseIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M3 12h4l2-5 4 10 2-5h6" />
+    </Icon>
+  );
+}
+function EmptyIcon(): ReactNode {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12h8" />
+    </Icon>
+  );
+}
+function LaptopIcon(): ReactNode {
+  return (
+    <Icon>
+      <rect x="5" y="5" width="14" height="10" rx="1" />
+      <path d="M3 19h18" />
+    </Icon>
+  );
+}
+function FolderIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M3 7h7l2 2h9v10H3V7Z" />
+    </Icon>
+  );
+}
+function BotIcon(): ReactNode {
+  return (
+    <Icon>
+      <rect x="5" y="7" width="14" height="12" rx="3" />
+      <path d="M12 3v4M9 12h.01M15 12h.01M9 16h6" />
+    </Icon>
+  );
+}
+function FileIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M6 3h8l4 4v14H6V3Z" />
+      <path d="M14 3v5h5M9 13h6M9 17h5" />
+    </Icon>
+  );
+}
+function PersonIcon(): ReactNode {
+  return (
+    <Icon>
+      <circle cx="12" cy="8" r="3" />
+      <path d="M6 20a6 6 0 0 1 12 0" />
+    </Icon>
   );
 }
 

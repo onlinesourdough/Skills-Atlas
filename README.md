@@ -1,159 +1,126 @@
-# Online Sourdough Skills Atlas
+# Skill Atlas
 
-The Atlas is a public-first, self-hostable map for agent skills. Its default
-product surface is a clustered relationship graph with a searchable library,
-persistent skill detail, demo usage shape, and deterministic Ask panel. A
-five-page first-visit walkthrough explains why one shared Git source matters.
+Skill Atlas is a public-first, self-hostable way to understand and operate a
+Git-backed skills library. It gives non-technical teammates a graph, searchable
+library, complete Markdown reader, repository health view, plugin imports, and a
+permission-aware pull-request workflow while GitHub remains the source of truth.
 
-The static public edition uses a safe bundled snapshot. The complete Node
-edition can instead read one operator-mounted Git checkout whose canonical
-files are `skills/<slug>/SKILL.md`.
+- Release target: [skills.onlinesourdough.com](https://skills.onlinesourdough.com)
+- Default skills source: [onlinesourdough/Skills](https://github.com/onlinesourdough/Skills)
+- Application source: [onlinesourdough/Skills-Atlas](https://github.com/onlinesourdough/Skills-Atlas)
+- [Issues](https://github.com/onlinesourdough/Skills-Atlas/issues) · [MIT license](LICENSE)
 
-The Git repository remains the source of truth. The Atlas owns the readable
-map, library, safe excerpts, deterministic search/Ask surface, and optional
-activity shape. This repository is the canonical Project home for the
-implementation, operation, proof, and recovery records.
-The public Git remote is
-[`onlinesourdough/Skills-Atlas`](https://github.com/onlinesourdough/Skills-Atlas).
+On startup, Atlas attempts a bounded anonymous read of `onlinesourdough/Skills`.
+Once that repository is safely public, a successful read becomes the active,
+read-only default and shows the observed GitHub revision and complete current
+inventory. If GitHub is unavailable, private, offline, or rate-limited, Atlas
+keeps working with a clearly labelled `Offline example`. That fictional
+fallback is not live repository content.
 
-## Run it
+Lead Review passed for r4. The startup success path is proven with deterministic
+GitHub fixtures; the public Skills anonymous production read, Pages run and
+deployment, custom domain, DNS, and TLS remain pending until their later Ship
+steps verify them.
 
-Requires Node 20.19 or newer.
+## What it includes
+
+- **Graph** renders only loaded skills and source-backed relations. Category
+  selection changes emphasis without removing topology; desktop supports
+  selection and pan/zoom, with a readable mobile fallback.
+- **Library** filters skills, safely renders complete Markdown, preserves full
+  source, and exposes repository, path, revision, relations, and effective
+  access without duplicating GitHub as a content store.
+- **Usage & health** says when usage telemetry is not connected and computes
+  only repository-health signals supported by loaded data.
+- **Plugins** imports public GitHub repositories without a credential and shows
+  source-declared skills, apps, or MCP servers plus `Read only` or `Can edit`.
+- **Self-hosted proposals** are available only after an Atlas admin session and
+  verified GitHub write permission. Atlas creates a branch and pull request; it
+  never writes directly to the default branch.
+
+## Local development
+
+Node 20.19 or newer is required.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-`npm run dev` starts the browser preview. To build the exact static public
-artifact without an API dependency or false live-source warning:
+Build and run the complete self-hosted unit:
+
+```sh
+npm run boot
+curl -fsS http://127.0.0.1:4173/api/health
+```
+
+The default listener is `http://127.0.0.1:4173`. With no optional environment
+configuration, Node mode remains public and read-only. See
+[`.env.example`](.env.example) and [operations](docs/operations.md) for the
+admin/session, private-read, TLS, and least-privilege token boundary.
+
+## Self-hosted configuration
+
+| Value                   | Purpose                                                   |
+| ----------------------- | --------------------------------------------------------- |
+| `ATLAS_ADMIN_PASSWORD`  | Independent admin sign-in for private reads and proposals |
+| `GITHUB_TOKEN`          | Server-only GitHub credential; never sent to the browser  |
+| `ATLAS_COOKIE_SECURE=1` | Required when the browser reaches Atlas over HTTPS        |
+| `HOST`, `PORT`          | Listener; safe defaults are `127.0.0.1` and `4173`        |
+
+Logged-out Node imports deliberately omit the configured token, so anonymous
+users cannot probe private repository existence through an operator credential.
+GitHub 404 becomes the generic `Repository unavailable or private` response.
+The browser never asks for or stores a GitHub token.
+
+The Node process does not terminate TLS or provide an access proxy. A
+self-hosting operator owns HTTPS, network access, environment permissions,
+token scope/rotation, and process supervision. See [security](docs/security.md)
+and [recovery](docs/recovery.md).
+
+## Static release and GitHub Pages
+
+Build the credential-free artifact with:
 
 ```sh
 npm run build:static
 npm run preview:static
 ```
 
-To run the complete self-hostable unit, build and start the production
-artifact:
+`dist/static/` works at both `/` and `/Skills-Atlas/`. It includes the canonical
+repository identifier needed for anonymous startup and the fictional offline
+fallback, but no GitHub credential, unpublished skill body, withheld revision,
+owner-local path, or write endpoint.
+
+GitHub Pages is the single public deployment owner. The SHA-pinned manual
+workflow in [pages.yml](.github/workflows/pages.yml) publishes `dist/static`,
+and [`public/CNAME`](public/CNAME) declares `skills.onlinesourdough.com`. The
+receiving Simply DNS CNAME target is `onlinesourdough.github.io`; this pre-Ship
+finalization does not change or verify Pages or DNS.
+
+## Verification
 
 ```sh
-npm run boot
-```
-
-The process listens on `http://127.0.0.1:4173` by default. Check it with:
-
-```sh
-curl http://127.0.0.1:4173/api/health
-```
-
-Use [`.env.example`](.env.example) for the supported configuration. Set
-`SKILLS_REPO_PATH` to an absolute local checkout containing
-`skills/<slug>/SKILL.md`; the server reads it on the server side only. Invalid,
-empty, oversized, unsafe, or unavailable sources safely return the bundled
-snapshot with a visible warning. The browser never receives the configured
-root path or a credential.
-
-## What is included
-
-- A light, graph-first Atlas shell with top-level Graph, Library, and Usage
-  views plus a narrow department/source taxonomy.
-- A focused five-page first-visit walkthrough with deterministic replay,
-  Back/Next/Skip/Escape, progress, and a public entry action.
-- A clustered selectable relation graph, three-region library with persistent
-  detail/editor shape, safe excerpt, source path/version, and visibly denied
-  public save action.
-- Global search (`Cmd/Ctrl-K`), an Ask the Atlas control across core views,
-  deterministic bundled answers, ranked demo usage/quiet skills, subordinate
-  demo activity, setup permission copy, and six inspectable state fixtures.
-- Responsive desktop/mobile layout, visible focus, Escape/focus restoration,
-  reduced-motion behavior, offline fallback, and no horizontal overflow.
-- A strict frontmatter parser and bounded local filesystem adapter for the
-  canonical `skills/<slug>/SKILL.md` shape.
-
-The public snapshot is deliberately concise and safe. Activity is demo data;
-Ask does not call a model; setup does not perform OAuth; editing, telemetry,
-provider access, and writes are not implemented.
-
-## Static public release
-
-The checked-in manual workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml)
-builds `dist/static/` for `skills.onlinesourdough.com`; [CNAME](public/CNAME)
-and `.nojekyll` are included in that artifact. Initial release commit
-`5bc468625703a1f87a2a3ece431645c3aab3ac0a` is published on `main`, and
-[Pages run 32969456173](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32969456173)
-completed successfully for that exact commit.
-
-GitHub reports workflow-based Pages at
-`https://onlinesourdough.github.io/Skills-Atlas/`. The initial root-base
-artifact left assets unavailable at that repository subpath. Corrective commit
-`0a57991d35fe736b3864fe3699ec5393248a03ad`, delivered by successful
-[Pages run 32974304026](https://github.com/onlinesourdough/Skills-Atlas/actions/runs/32974304026),
-makes only static production mode use a relative base. The live repository URL
-now completes all five onboarding steps plus Graph, Library/edit denial, Usage,
-and deterministic Ask; its HTML, JS, CSS, three fonts, and favicon return 200
-with no API requests or browser failures.
-
-As of 2026-08-26, public DNS still has no record for
-`skills.onlinesourdough.com` and the Pages API reports `cname: null`. No DNS or
-Pages custom-domain setting changed. The static edition uses only bundled data;
-mounted source reads and `/api/health` require the Node edition.
-
-## Architecture and records
-
-- [Project-local Spec](docs/spec.md) — resolved Build contract and boundaries.
-- [Technology decision](docs/technology.md) — responsibility/owner/exit
-  choices for the single deployable.
-- [Architecture](docs/architecture.md) — browser, API, parser, and fallback
-  contracts.
-- [Security and permissions](docs/security.md) — trust boundaries and bounds.
-- [Operations](docs/operations.md) — build, boot, health, and source setup.
-- [Ownership](docs/ownership.md), [proof](docs/proof.md), and
-  [recovery](docs/recovery.md) — handoff truth and tested evidence.
-- [Review](docs/review.md) — the project-local correctness/security/simplicity
-  gate and residual risks.
-- [Design translation](docs/design.md) — approved warm paper/brown/Geist
-  inputs and receiving-project decisions.
-
-## Project-local distribution
-
-The Atlas is an application, not a harness plugin. A team can keep the
-canonical cross-project skills separately and point an Atlas at the same
-Git-backed source. The inspected Skills repository records this verified,
-project-local installer route for Codex/ChatGPT, Claude Code, and Cursor:
-
-```sh
-npx skills@1.5.23 add onlinesourdough/Skills#v0.1.0 --skill clarify manage-skills route-models --agent claude-code cursor -y
-npx skills@1.5.23 list --agent claude-code cursor
-```
-
-That command is documented distribution guidance, not an action performed by
-this Atlas. The source repository remains the authority; the adapter paths and
-rollback/update steps are described in its own release record. Model-backed
-forward behavior for logged-out Claude and Cursor Agent runtimes is not claimed
-by that proof.
-
-## Checks
-
-```sh
-npm run format:check
-npm run lint
-npm run typecheck
-npm test
-npm run build
-npm run build:static
+npm run check
 npm run docs:check
 npm run security:check
-npm run browser:proof
+npm audit --audit-level=high
 npm audit --omit=dev --audit-level=high
+npm run browser:proof
+git diff --check
 ```
 
-The complete local gate is `npm run check`; it builds both Node and static
-artifacts. `npm run browser:proof` exercises both shapes in real Chrome.
-Reviewable browser/runtime evidence is kept under the ignored `proof/`
-directories; the acceptance record in [docs/proof.md](docs/proof.md) names the
-exact run and limitations.
+Browser proof uses local deterministic GitHub fixtures and intercepted proposal
+responses. It exercises desktop/mobile onboarding, canonical startup, Graph,
+Library, Usage, Plugins, fallback/retry, permissions, safe Markdown, GitHub
+navigation, and both static URL roots without creating a remote branch or pull
+request. Evidence is summarized in [proof](docs/proof.md).
 
-The authorized initial and corrective commits, public remote, and Pages
-deployments are recorded in [docs/proof.md](docs/proof.md). No OAuth grant,
-provider/model action, telemetry, credential, or DNS change was made. See
-[LICENSE](LICENSE) for the project license.
+## Contributing and security
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change. Report
+security concerns through [SECURITY.md](SECURITY.md), not a public issue.
+
+`package.json` intentionally has `"private": true` to prevent accidental npm
+publication. That npm safety flag does not mean the GitHub source repository is
+private.

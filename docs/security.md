@@ -1,68 +1,102 @@
 # Security and permissions
 
-The default security posture is public read-only browsing with a checked-in
-fallback. A private operator may mount one checkout, but source access stays
-on the server.
+The default posture is public, credential-free, read-only browsing. GitHub
+content remains canonical. Private reads and every provider write require two
+independent server-side conditions: an authenticated Atlas admin session and an
+operator-supplied GitHub credential.
 
 ## Trust boundaries
 
-- Browser input is untrusted and is used only for local filtering, deterministic
-  answers, and view state.
-- Markdown from a mounted checkout is untrusted text. It is parsed with a
-  small frontmatter grammar and rendered through React text nodes; it is not
-  inserted as HTML or executed as code.
-- `SKILLS_REPO_PATH` is server configuration. It is never included in an API
-  response, browser bundle, error message, or structured log.
-- The public setup provider choice is explanatory copy only. No credential is
-  accepted, stored, transmitted, or logged.
-- Static mode skips `/api/skills` at compile time. Its bundled source is normal
-  behavior, so a static host cannot accidentally trigger a private source read
-  or leak a configured server path.
+- Static startup and manual imports make unauthenticated `GET` requests directly
+  to the public GitHub REST API. The static UI has no credential input, bundle
+  value, storage key, cookie, or write endpoint.
+- Node public imports deliberately omit the configured GitHub token. This
+  prevents an unauthenticated browser from probing private repositories through
+  an operator's credential.
+- An authenticated checkout of `onlinesourdough/Skills` was anonymously denied
+  with HTTP 404 on 2026-08-27. It is treated as private/unavailable. Its source
+  bodies and newly observed revision are prohibited from the public bundle;
+  access is possible only through authenticated self-hosted configuration.
+- `ATLAS_ADMIN_PASSWORD` and `GITHUB_TOKEN` are server environment values only.
+  They are never returned, logged, placed in URLs, persisted in browser
+  storage, included in client builds, or accepted by the Plugins form.
+- Admin login creates a random, bounded, in-memory session identified by an
+  `HttpOnly`, `SameSite=Strict` cookie. Restart revokes every session. Login,
+  logout, and proposal requests enforce JSON/origin expectations and fail
+  closed when admin configuration is absent.
+- GitHub provider JSON and browser/API input are untrusted. Repository names,
+  paths, branch/proposal identifiers, response schemas, content sizes, and
+  Markdown are runtime-validated before use.
+- Skill Markdown is preserved in full but rendered without raw HTML. React and
+  the Markdown renderer own text escaping and safe URL handling; source is
+  never executed or inserted with `dangerouslySetInnerHTML`.
 
-## Bounds and denial
+## Provider reads
 
-The adapter enforces a maximum of 100 directory entries and 128 KiB per
-`SKILL.md`, checks every path stays beneath the configured root, rejects root,
-directory, and file symlinks, and applies a 1.5 second read timeout. The HTTP
-request boundary has a four second timeout. Slugs are limited to 80 characters
-and descriptions to 320 characters so a server-accepted local snapshot also
-meets the browser contract. Invalid frontmatter, mismatched names, duplicate
-fields, empty bodies, unsafe slugs, and malformed files fail the complete local
-snapshot and use the bundled fallback.
+Reads accept only `owner/repository` identifiers and exact
+`skills/<safe-slug>/SKILL.md` files. The adapter caps tree entries, accepted
+skills, one file, aggregate decoded bytes, concurrent requests, timeout,
+read-only retries, and response/error text. Truncated trees, malformed provider
+payloads, unsafe paths, duplicate or invalid skills, unavailable/private
+repositories, authentication failure, and rate limits return stable safe codes.
+The active plugin is retained after an import failure.
 
-The HTTP surface accepts reads only. Public edit controls are disabled in the
-browser and there is no server mutation path to bypass that presentation.
+Anonymous 404 always becomes `Repository unavailable or private`; status copy,
+logs, and timing policy do not confirm repository existence. The effective
+access label is based on provider repository permissions:
+tokenless public reads are `Read only`; `Can edit` requires a server-token
+response with verified `push: true` inside an authenticated session. Client
+state alone never authorizes a write.
 
-## Logging and deployment
+## Pull-request proposal policy
 
-Logs contain a request ID, route, status, and duration only. They do not log
-query strings, source roots, file contents, headers, or credentials. The
-default host is `127.0.0.1`; an operator choosing a network bind owns the
-network boundary and should place the process behind its normal TLS/access
-controls.
+`POST /api/proposals` requires an authenticated admin session, configured
+server token, same-origin request, validated repository/path/content/title, and
+a client proposal identifier. Immediately before the first mutation, the
+server re-fetches repository permission and default-branch SHA. It rejects
+permission denial and stale SHA.
 
-Dependency review is performed with the lockfile, `npm audit --omit=dev`, and
-the project secret scan. Refreshes must rerun tests, build, docs, security,
-and the browser proof before handoff.
+The only allowed sequence is:
 
-The prepared Pages workflow is manual-only, grants `contents: read`,
-`pages: write`, and `id-token: write`, and contains no secret input. The
-authorized initial Ship ran it once from the public canonical repository. The
-authorized corrective Ship ran it once more for commit
-`0a57991d35fe736b3864fe3699ec5393248a03ad`. Before any later Ship, the owner
-must re-review the immutable workflow action commits, branch/environment
-protections, domain verification, repository visibility, and exact candidate
-commit. `npm run security:check` rejects mutable third-party `uses:`
-references; each current full-SHA pin keeps a trailing major-tag comment for
-the documented re-resolution path. The corrective run succeeded with a
-non-failing GitHub annotation that several pinned actions' Node 20 internals
-were forced to Node 24; a future action-pin refresh remains a separately
-reviewed change.
+1. create `refs/heads/atlas/<slug>-<proposal-id>` from the observed default
+   branch SHA;
+2. update exactly one validated `skills/<slug>/SKILL.md` on that branch, using
+   the observed file blob SHA;
+3. open a pull request from the proposal branch to the default branch.
+
+The server never writes the default branch and does not automatically retry a
+write. Duplicate branch, update failure, and pull-request failure are explicit.
+A partial failure may leave an operator-visible orphan branch; automatic
+deletion could remove recoverable work and is therefore excluded.
+
+## HTTP, logging, and operation
+
+Security headers deny framing, MIME sniffing, object/base embedding, and
+cross-origin referrers. Node request logs contain request ID, normalized route,
+status, outcome, and duration—not query strings, headers, cookies, repository
+source, Markdown, passwords, or tokens. Request bodies and provider payloads
+are never logged.
+
+The default bind is `127.0.0.1`. A network-exposed operator owns TLS, access
+proxying, password/token rotation, least-privilege GitHub scope, process
+isolation, and environment-file permissions. A public static host owns only the
+credential-free bundle.
+
+Dependencies are lockfile-pinned and reviewed with full and production audits,
+license evidence, the secret/publish-safety scan, immutable workflow-action
+validation, builds, tests, and browser proof. Canonical startup success and
+provider writes are fixture/mock-proven during r4 Build; no real credential,
+private read, branch, PR, OAuth grant, remote publication, or deployment is
+claimed. Source review keeps unpublished bodies out of bundled data. Static
+artifact scans reject the withheld revision, failed-fetch text, owner-home
+paths, and credential-shaped values while allowing the canonical repository
+identifier required for anonymous startup.
 
 ## Residual risk
 
-The adapter trusts the operator-selected local checkout and does not verify
-Git signatures or commit policy. It reads a bounded point-in-time directory
-view and intentionally has no persistence or locking. A future provider
-adapter would require a separate authorization and security review; it must
-not be inferred from this read-only implementation.
+Tokenless reads inherit GitHub availability and rate limits. An operator can
+grant a token broader rights than the Atlas needs; documentation requires
+least privilege but cannot constrain provider-side scope. In-memory sessions
+are intentionally single-process. Source content can change after a plugin read;
+the proposal's observed SHA check prevents silently writing from stale default
+branch state.

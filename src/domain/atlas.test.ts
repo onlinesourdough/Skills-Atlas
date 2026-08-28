@@ -1,30 +1,80 @@
 import { describe, expect, it } from "vitest";
-import { BUNDLED_SKILLS } from "../data/bundled-skills.js";
-import { answerQuestion, categoriesForSkills, filterSkills } from "./atlas.js";
+import { EXAMPLE_PACK } from "../data/bundled-skills.js";
+import {
+  categoriesForSkills,
+  filterSkills,
+  graphCategoryEmphasis,
+  relationCount,
+  relationEdges,
+  repositoryHealth,
+} from "./atlas.js";
 
 describe("atlas index behavior", () => {
-  it("filters by text and category without mutating the source", () => {
-    const result = filterSkills(BUNDLED_SKILLS, "source", "Govern the shelf");
-    expect(result.map((skill) => skill.slug)).toEqual(["source-audit"]);
-    expect(BUNDLED_SKILLS).toHaveLength(8);
+  it("searches complete active-pack truth and filters by real category", () => {
+    const result = filterSkills(EXAMPLE_PACK.skills, "acceptance evidence", "Delivery");
+    expect(result.map((skill) => skill.slug)).toEqual(["launch-checklist"]);
+    expect(categoriesForSkills(EXAMPLE_PACK.skills)).toEqual([
+      "All skills",
+      "Delivery",
+      "Governance",
+      "Operations",
+      "Sales",
+    ]);
   });
 
-  it("answers deterministically from the bundled index", () => {
-    const answer = answerQuestion("where is the canonical git source?", BUNDLED_SKILLS);
-    expect(answer.title).toBe("Start with the source path");
-    expect(answer.related).toContain("source-audit");
-    expect(answer.matched).toBe(true);
+  it("counts only declared relations and computes data-supported health", () => {
+    expect(relationCount(EXAMPLE_PACK.skills)).toBeGreaterThan(0);
+    expect(repositoryHealth(EXAMPLE_PACK.skills)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "loaded", count: EXAMPLE_PACK.skills.length }),
+        expect.objectContaining({ id: "metadata", count: 0 }),
+        expect.objectContaining({ id: "relations", count: 0 }),
+      ]),
+    );
   });
 
-  it("returns a useful bounded fallback for unknown questions", () => {
-    const answer = answerQuestion("what should I bake today?", BUNDLED_SKILLS);
-    expect(answer.matched).toBe(false);
-    expect(answer.body).toContain("runtime AI is off");
-    expect(answer.related).toHaveLength(3);
+  it("does not invent metadata or relations for an isolated imported skill", () => {
+    const isolated = {
+      ...EXAMPLE_PACK.skills[0]!,
+      category: "Uncategorised",
+      relations: [],
+    };
+    expect(repositoryHealth([isolated])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "metadata", count: 1, severity: "attention" }),
+        expect.objectContaining({ id: "relations", count: 1, severity: "attention" }),
+      ]),
+    );
   });
 
-  it("keeps mounted source categories available to every atlas view", () => {
-    const custom = { ...BUNDLED_SKILLS[0]!, category: "Team practice" };
-    expect(categoriesForSkills([custom])).toContain("Team practice");
+  it("keeps a one-way relation whose declaration is lexically descending", () => {
+    const source = {
+      ...EXAMPLE_PACK.skills[0]!,
+      slug: "z-skill",
+      relations: ["a-skill"],
+    };
+    const target = {
+      ...EXAMPLE_PACK.skills[1]!,
+      slug: "a-skill",
+      relations: [],
+    };
+
+    expect(relationEdges([source, target])).toEqual([{ startSlug: "a-skill", endSlug: "z-skill" }]);
+    expect(relationCount([source, target])).toBe(1);
+  });
+
+  it("uses category selection as emphasis without removing graph skills", () => {
+    const emphasis = graphCategoryEmphasis(EXAMPLE_PACK.skills, "Delivery");
+    expect(emphasis.map((item) => item.slug)).toEqual(
+      EXAMPLE_PACK.skills.map((skill) => skill.slug),
+    );
+    expect(emphasis.filter((item) => item.emphasized).map((item) => item.slug)).toEqual(
+      EXAMPLE_PACK.skills
+        .filter((skill) => skill.category === "Delivery")
+        .map((skill) => skill.slug),
+    );
+    expect(
+      graphCategoryEmphasis(EXAMPLE_PACK.skills, "All skills").every((item) => item.emphasized),
+    ).toBe(true);
   });
 });
