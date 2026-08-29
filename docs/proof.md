@@ -8,14 +8,35 @@
   change, deployment, credential operation, authenticated adjacent read,
   provider branch, or pull request.
 
+## Project skill boundary evidence
+
+The 2026-08-29 unstaged Build keeps the application and Ship boundaries
+unchanged while making the Project-owned skill shelf explicit:
+
+- `.agents/skills` contains `README.md` plus exactly the six direct
+  Project-local lifecycle and technology skill folders: `spec-project`,
+  `choose-technology`, `build-project`, `review-project`, `ship-project`, and
+  `audit-project`.
+- Every direct folder matches its lowercase kebab-case frontmatter `name`; no
+  nested `SKILL.md` or copied Project-local generic manager remains.
+- Tracked stale-route scans find no retired routing slug or removed
+  local-manager path. The only remaining `manage-skills` mentions identify the
+  canonical Global Skill in the source inventory and deterministic fixture.
+- `npm run check`, `npm run docs:check`, `npm run security:check`, and
+  `git diff --check` pass. Deterministic browser proof also passes with four
+  canonical fixture skills and an empty `failures` array.
+
+No staging, Git history mutation, provider action, publication, deployment, or
+other repository was used.
+
 ## Publication boundary
 
 An authenticated checkout of `onlinesourdough/Skills` was anonymously denied
 with HTTP 404 before r4. The repository is still treated as private or otherwise
 unavailable before Ship. Atlas contains the canonical identifier and the
-reviewed five-slug inventory (`clarify`, `manage-skills`, `orchestrate-workers`,
-`route-models`, `shape-offer`) needed to prove startup behavior, but no private
-skill body or observed private revision.
+reviewed four-slug canonical Global Skill inventory (`clarify`, `manage-skills`,
+`orchestrate-workers`, `shape-offer`) needed to prove startup behavior, but no
+private skill body or observed private revision.
 
 The successful default-load path uses deterministic GitHub fixtures only. A
 real anonymous current read is a Ship gate after source history is remediated
@@ -25,7 +46,7 @@ and the Skills repository is safely public.
 
 - Initial static and Node boot attempt `onlinesourdough/Skills` through the
   existing bounded anonymous adapter. Valid provider identity, repository URL,
-  observed revision, five loaded skills, and `Read only` access become active.
+  observed revision, four loaded skills, and `Read only` access become active.
 - Provider failure retains the fictional `Offline example` with one calm status
   and Retry. Retry plus a later manual import upserts the canonical plugin
   without duplication.
@@ -82,7 +103,7 @@ Provider writes are mocks only.
 ## Browser evidence
 
 `proof/runtime/browser-proof.json` has an empty `failures` array. It records
-1440×900 and 390×844 viewports, five canonical fixture skills, header alignment,
+1440×900 and 390×844 viewports, four canonical fixture skills, header alignment,
 centered onboarding, Graph/Library/Usage/Plugins journeys, fallback then retry,
 one canonical plugin after re-import, safe source navigation, intercepted edit
 permission/proposal state, clean page/console/network diagnostics, and static

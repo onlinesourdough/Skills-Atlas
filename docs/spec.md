@@ -13,9 +13,9 @@ planning artifact is required.
   accepted during Review.
 - Canonical skill source when its public-history remediation is complete:
   `https://github.com/onlinesourdough/Skills`. The reviewed adjacent candidate
-  declares a skills-only Codex plugin and five slugs: `clarify`,
-  `manage-skills`, `orchestrate-workers`, `route-models`, and `shape-offer`.
-  Its full private skill bodies and current revision are not Atlas Build inputs.
+  declares a skills-only Codex plugin and four canonical Global Skill slugs:
+  `clarify`, `manage-skills`, `orchestrate-workers`, and `shape-offer`. Its full
+  private skill bodies and current revision are not Atlas Build inputs.
 - Public application/source targets:
   `https://skills.onlinesourdough.com` and
   `https://github.com/onlinesourdough/Skills-Atlas`.
@@ -35,7 +35,7 @@ surface, never a competing content store.
 
 - **RESOLVED:** initial boot should attempt an anonymous bounded read of
   `onlinesourdough/Skills`; a successful result becomes active and displays its
-  provider identity, observed revision, five loaded skills, and `Read only`.
+  provider identity, observed revision, four loaded skills, and `Read only`.
 - **RESOLVED:** the source is still private or anonymously unavailable before
   Ship. Pre-Ship work must not make an authenticated adjacent read, embed its
   source/revision, or claim live success. Startup success is
@@ -104,7 +104,7 @@ rail/tab grid and mobile fit.
    explanation, and all lifecycle records describe public source, install,
    self-hosting, security, Pages ownership, recovery, and unresolved Ship gates.
 4. **Browser proof:** deterministic Node/static interception covers centered
-   onboarding, five-skill default Graph/Library source/Usage/Plugins, GitHub
+   onboarding, four-skill default Graph/Library source/Usage/Plugins, GitHub
    navigation, fallback/error/retry, write-permission mocks, clean diagnostics,
    and exact `/` plus `/Skills-Atlas/` static assets.
 5. **Repository proof:** format, lint, strict client/server types, all tests,
@@ -114,7 +114,7 @@ rail/tab grid and mobile fit.
 ## Ship gates and residual risk
 
 During Ship, the Skills repository must first be safely public with remediated
-history. Ship must then prove an anonymous current read and exact five-skill
+history. Ship must then prove an anonymous current read and exact four-skill
 source, dispatch and verify the pinned Pages workflow, confirm
 `skills.onlinesourdough.com` DNS points to `onlinesourdough.github.io`, and
 verify domain HTTP/TLS plus the live default journey. None of those actions or

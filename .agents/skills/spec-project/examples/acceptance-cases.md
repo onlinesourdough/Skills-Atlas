@@ -131,9 +131,10 @@ are resolved.
 **Expected:** The workflow invokes `choose-technology` only after the contract
 is ready. The decision records Build, Buy, Rent, or Self-host choices, fit
 evidence, operator burden, verification and proof, update path, and exit path.
-If a concrete specialist implementation gap is proven, it routes to
-`manage-skills`; the Project does not preload or install React, FastAPI,
-Supabase, or other stack-specific skills.
+If a concrete specialist implementation gap is proven, it follows the external
+capability boundary in the [project-local skills index](../../README.md); the
+Project does not preload or install React, FastAPI, Supabase, or other
+stack-specific skills.
 
 ## Full Stack FastAPI reference is conditional
 

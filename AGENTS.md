@@ -24,7 +24,12 @@ Project. Keep resolved context intact and record technical inferences locally.
 | Correctness, security, simplicity, and proof review      | `.agents/skills/review-project/SKILL.md`    |
 | Authorized delivery, deployment, activation, or recovery | `.agents/skills/ship-project/SKILL.md`      |
 | Periodic whole-repository health check                   | `.agents/skills/audit-project/SKILL.md`     |
-| A concrete specialist capability gap                     | `.agents/skills/manage-skills/SKILL.md`     |
+
+The Project-owned shelf and its boundary are indexed in
+[Project-local skills](.agents/skills/README.md). Generic cross-project skill
+discovery, installation, and updates use an optional manager installed by the
+calling environment or its current harness/plugin mechanism, outside this
+Project payload.
 
 Keep one lifecycle record across Spec, Build, Review, revisions, and any
 authorized Ship. The Project repository is canonical after creation.

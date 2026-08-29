@@ -115,8 +115,11 @@ For a new or materially changed technology decision, use
 dimensions are resolved. It is the only project technology-selection
 procedure. Its Full Stack FastAPI reference is loaded only when every fit gate
 might be independently satisfied. A concrete specialist implementation gap
-routes to [manage-skills](../manage-skills/SKILL.md); do not preload or install
-stack-specific skills in this Project.
+follows the external capability boundary in the
+[project-local skills index](../README.md): use an optional manager installed
+by the calling environment or its current harness/plugin mechanism, outside
+this Project payload. Do not preload or install stack-specific skills in this
+Project.
 
 ## Return one readiness gate
 

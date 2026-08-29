@@ -29,7 +29,7 @@ Closed in r4:
 
 1. Startup now attempts `onlinesourdough/Skills` through the anonymous adapter,
    validates canonical identity/URL, normalizes access to read-only, activates
-   the five-skill result, and upserts without duplication.
+   the four-skill result, and upserts without duplication.
 2. Unavailable/private and rate-limit failures retain a clearly unattributed
    `Offline example`; one calm status offers Retry and never claims repository
    truth.

@@ -68,7 +68,6 @@ const canonicalSkillDefinitions = [
   ["clarify", "Clarify"],
   ["manage-skills", "Manage skills"],
   ["orchestrate-workers", "Orchestrate workers"],
-  ["route-models", "Route models"],
   ["shape-offer", "Shape offer"],
 ];
 const canonicalSkillSources = new Map(
@@ -541,7 +540,7 @@ async function exerciseDesktop(page, diagnostics) {
     "desktop: graph category count is not source-derived",
   );
   assert(
-    (await page.locator(".skill-node").count()) === 5,
+    (await page.locator(".skill-node").count()) === canonicalSkillDefinitions.length,
     "desktop: graph includes non-skill nodes or omits a skill",
   );
   const graphLabelsAreDistinct = await page.locator(".skill-node text").evaluateAll((labels) => {
@@ -583,7 +582,8 @@ async function exerciseDesktop(page, diagnostics) {
     "desktop: category emphasis filtered graph topology",
   );
   assert(
-    (await page.locator(".skill-node.category-emphasized").count()) === 5,
+    (await page.locator(".skill-node.category-emphasized").count()) ===
+      canonicalSkillDefinitions.length,
     "desktop: category selection did not create visual emphasis",
   );
   await page.screenshot({ path: screenshotPath("r4-desktop-graph-category-emphasis.png") });
@@ -607,7 +607,7 @@ async function exerciseDesktop(page, diagnostics) {
 
   await page.getByRole("button", { name: "Library", exact: true }).click();
   assert(
-    (await page.locator(".skill-list > button").count()) === 5,
+    (await page.locator(".skill-list > button").count()) === canonicalSkillDefinitions.length,
     "desktop: Library does not list the complete canonical plugin",
   );
   assert(
@@ -667,7 +667,7 @@ async function exerciseDesktop(page, diagnostics) {
 
   await page.keyboard.press("Control+K");
   const search = page.getByLabel("Search active skill plugin");
-  await search.fill("models");
+  await search.fill("offer");
   assert(
     (await page.locator(".search-results > button").count()) > 0,
     "desktop: global search returned no source-grounded result",
@@ -772,7 +772,7 @@ async function exerciseDesktop(page, diagnostics) {
   observations.push({
     label: "desktop-journey",
     onboardingSteps: onboarding.length,
-    graphSkills: 5,
+    graphSkills: canonicalSkillDefinitions.length,
     graphCategories: 1,
     categoryEmphasisPreservedTopology: true,
     fullMarkdown: true,
@@ -796,7 +796,8 @@ async function exerciseMobile(page, diagnostics) {
     "mobile: desktop graph remained visible",
   );
   assert(
-    (await page.locator(".mobile-relationship-list > button").count()) === 5,
+    (await page.locator(".mobile-relationship-list > button").count()) ===
+      canonicalSkillDefinitions.length,
     "mobile: relationship fallback is incomplete",
   );
   await page.screenshot({ path: screenshotPath("r4-mobile-graph-loaded-default.png") });
@@ -1107,7 +1108,7 @@ async function exerciseStatic(page, baseUrl, label, screenshot, diagnostics) {
     `${label}: public account state missing`,
   );
   const loadedNodeCount = await page.locator(".skill-node").count();
-  if (loadedNodeCount !== 5) {
+  if (loadedNodeCount !== canonicalSkillDefinitions.length) {
     throw new Error(
       `${label}: canonical default graph unavailable; mock=${JSON.stringify(githubMock)}`,
     );

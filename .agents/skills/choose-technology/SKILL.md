@@ -1,6 +1,6 @@
 ---
 name: choose-technology
-description: Select the smallest technology after responsibilities, ownership, risks, operation, recovery, and proof are known. Use only for a new or materially changed technology decision; bypass a working stack when the change does not materially alter it, and route concrete specialist gaps to manage-skills.
+description: Select the smallest technology after responsibilities, ownership, risks, operation, recovery, and proof are known. Use only for a new or materially changed technology decision; bypass a working stack when the change does not materially alter it, and use the project skill index boundary for concrete specialist gaps.
 ---
 
 # Choose Technology
@@ -20,10 +20,13 @@ reason to preload stack-specific skills.
 3. For a new or materially changed technology decision, select the smallest
    capabilities after the contract is ready. Do not choose from popularity or
    from a starter's included layers.
-4. If a concrete specialist implementation gap remains, route it to
-   `.agents/skills/manage-skills/SKILL.md` after the technology decision. Add
-   only a justified, reviewed project-local skill; do not install or invent
-   React, FastAPI, Supabase, or other stack-specific skills in the Project.
+4. If a concrete specialist implementation gap remains, follow the external
+   capability boundary in the [project-local skills index](../README.md) after
+   the technology decision. Use an optional manager installed by the calling
+   environment or its current harness/plugin mechanism, outside this Project
+   payload. Add only a justified, reviewed project-local skill; do not install
+   or invent React, FastAPI, Supabase, or other stack-specific skills in the
+   Project.
 5. Hand the resolved decision and its evidence to `build-project`. Build
    consumes that decision and does not preload every technology reference.
 
@@ -92,7 +95,8 @@ Record one explicit technology decision with:
 - contracts, dependencies, cost or license concerns, and failure behavior;
 - verification for build, operation, denial or failure, and recovery;
 - update and replacement or exit paths; and
-- residual risks and any capability gap routed to `manage-skills`.
+- residual risks and any capability-gap handoff through the external boundary
+  in the project-local skills index.
 
 Do not return a catalog of unselected stacks. If the decision is not
 independently justified, keep the existing stack or choose the smaller
