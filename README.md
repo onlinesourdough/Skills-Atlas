@@ -1,3 +1,7 @@
+![Online Sourdough Skills Atlas](assets/branding/atlas-banner.png)
+
+<a href="assets/branding/atlas-icon.png"><img src="assets/branding/atlas-icon.png" alt="Skills Atlas icon" width="32" height="32" /></a>
+
 # Skill Atlas
 
 Skill Atlas is a public-first, self-hostable way to understand and operate a

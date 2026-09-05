@@ -318,7 +318,7 @@ function trackStaticNetwork(page, label, baseUrl) {
     const url = new URL(response.url());
     if (url.origin !== base.origin) return;
     const resourceType = response.request().resourceType();
-    const kind = url.pathname.endsWith("/favicon.svg") ? "favicon" : resourceType;
+    const kind = url.pathname.endsWith("/favicon.png") ? "favicon" : resourceType;
     evidence.localResponses.push({ kind, path: url.pathname, status: response.status() });
   });
   return evidence;

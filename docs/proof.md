@@ -1,5 +1,38 @@
 # Pre-Ship proof
 
+## Stack branding r1b — 2026-09-05
+
+Mechanical Build based on `732e5a7d788b2fb0b02fe33004b813b7bd906df5`,
+matching freshly fetched `origin` branch `main`. README adds the reviewed
+banner and a linked 32-pixel icon; all prior prose is preserved. Exact PNGs:
+
+- `assets/branding/atlas-banner.png` (1536×512), SHA256
+  `bbbf590d83008e3a5153a7d814bdb8b820038a6c978b46676c9bc904a920a108`.
+- `assets/branding/atlas-icon.png` (512×512), SHA256
+  `b4deb502a579ff9ab477560464b8097398e4f805df4c576e2c8195ca567d7c99`.
+
+`public/favicon.png` is an exact copy of the same icon. `index.html` references
+it as `image/png`; Vite preserves the root URL for Node and rewrites it relative
+to the static base. The Node MIME table now serves PNG as `image/png`, and the
+existing browser proof recognizes the PNG favicon. Inline AtlasMark is unchanged.
+
+Local validation: exact source/destination hashes, PNG dimensions, Markdown and
+HTML links, prior-prose preservation, `npm run check` (38 tests and fresh Node
+and static builds), `npm run docs:check`, `npm run security:check`, and
+`git diff --check` pass. The existing static chunk-size warning remains.
+The browser proof passes against final builds, including both static URL roots.
+Direct HTTP checks confirm `image/png`, HTTP 200, and the approved response
+SHA256 at Node `/favicon.png`, static `/favicon.png`, and static
+`/Skills-Atlas/favicon.png`. Provider reads/writes in browser proof use fixtures.
+
+Lead accepted r1 README/proof and asset hashes and supplied visual approval.
+Local self-review: PASS for r1b, pending lead-bound Review. Recovery was
+rehearsed in a temporary copy: reverse the five text edits and remove only the
+three added PNGs to reproduce the baseline bytes, retaining the original SVG.
+Operational rollback would require rebuilding and separately authorized Ship;
+no deployed rollback is claimed. No commit, push, release, or deployment
+occurred; existing privacy and Ship holds remain.
+
 ## Contributor instruction audit — 2026-09-05
 
 Bounded local instruction audit, ready for lead Review; this does not change
