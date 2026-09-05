@@ -6,10 +6,12 @@ Build and operate the smallest independent Project that creates this outcome:
 
 ## Start
 
-Read this file, [README.md](README.md), and the canonical context for the
-Project. Confirm that this repository owns an independent lifecycle. Run the
-project-local Spec before implementation when scope, ownership, boundaries,
-proof, or contracts are not already clear.
+Read this file and [README.md](README.md), then only the canonical documents
+needed for the requested change. This repository owns an independent lifecycle;
+revisit that boundary only when the change affects ownership. Use the
+project-local Spec when material scope, ownership, boundaries, acceptance, or
+contracts remain unclear. A resolved local mechanical edit needs no new Spec
+or technology decision.
 
 Ask one question only when a missing owner decision materially changes the
 Project. Keep resolved context intact and record technical inferences locally.
@@ -36,10 +38,13 @@ authorized Ship. The Project repository is canonical after creation.
 
 ## Before completion
 
-Verify behavior through the real interface or validator. Run the relevant
-format, lint, type, test, build, contract, and security checks. Check failure,
-denial, duplicate, and recovery behavior as relevant. Keep the README and
-[proof record](docs/proof.md) current with actual evidence.
+Verify the changed behavior through its real interface or validator. Select
+checks from [README.md](README.md) by the affected surface and risk; substantive
+application changes require the full relevant suite, including failure, denial,
+duplicate, and recovery evidence. For instruction-only or mechanical edits,
+validate affected instructions, links, and meaningful regressions. Update the
+README when its truth changes and [proof record](docs/proof.md) with actual
+evidence, distinguishing local validation from live Ship proof.
 
 ## Ownership and recovery
 
@@ -47,3 +52,10 @@ Record current responsibility in [docs/ownership.md](docs/ownership.md),
 acceptance evidence in [docs/proof.md](docs/proof.md), and the tested recovery
 path in [docs/recovery.md](docs/recovery.md). Keep secrets and private data out
 of source, logs, exports, and client builds.
+
+GitHub remains canonical for imported skills. Public/static access is read-only;
+private reads require an Atlas admin session and server-only GitHub credential.
+Proposals additionally require verified provider write permission and a fresh
+source SHA, and use a branch plus pull request, never a default-branch write.
+Preserve the Skills privacy/public-history hold in [security](docs/security.md)
+and [proof](docs/proof.md); fixture success does not release that hold.

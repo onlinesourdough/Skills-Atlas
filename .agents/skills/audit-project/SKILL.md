@@ -1,10 +1,10 @@
 ---
 name: audit-project
 description: >-
-  Use when a natural-language request asks to audit, check, maintain, repair,
-  reconcile, or investigate drift in an evolved Project's current
-  truth, documentation, proof, ownership, security, operation, or recovery.
-  Run periodically after accumulated change, not for every trivial change.
+  Audit accumulated drift across this Project's documentation, behavior,
+  ownership, security, operation, and recovery. Use for an explicit holistic
+  health check or evidence of cross-cutting drift, not routine fixes, focused
+  checks, or per-change review.
 ---
 
 # Project Audit
@@ -16,10 +16,12 @@ outcome and canonical truth, never parity with the original seed.
 
 ## Audit
 
-Read the current README, project instructions, relevant skills, code,
-interfaces, configuration, workflows, tests, runbooks, and operational or
-recovery records. Establish the current outcome, owner, boundaries, and
-canonical sources before judging any document.
+Start with README, project instructions, and the requested audit boundary.
+Inspect the code, skills, interfaces, configuration, workflows, tests, and
+runbooks needed to compare claims with evidence. A whole-project audit covers
+each dimension below; a scoped audit names its coverage and remaining gaps.
+Establish the current outcome, owner, boundaries, and canonical sources before
+judging any document.
 
 Check, as relevant to the solution:
 
@@ -45,12 +47,15 @@ correcting an obvious command path. Re-read repaired routes and verify them.
 When available, run the repository's relevant documented safe, non-mutating
 validation commands. Record each exact command and its exact result. If a
 relevant check is unavailable or unsafe to run, disclose it as an evidence gap.
-Do not run consequential or mutating commands or operations.
+Do not infer authority for consequential operations from an audit request.
 
-Do not delete files or change runtime code, configuration, contracts, security
-meaning, ownership, authority, or operational behavior. Require one owner
-decision for semantic conflict, deletion, authority, or unclear canonical
-truth. Record the location, evidence, and decision needed; do not guess.
+An audit alone does not authorize deletion or changes to runtime code,
+configuration, contracts, security meaning, ownership, or operational behavior.
+When the request also authorizes bounded fixes, continue those through Build
+and Review in the same lifecycle; do not ask again for already-authorized work.
+Ask for one owner decision only when an unresolved semantic conflict, authority
+gap, or unclear canonical truth materially changes the result. Record its
+location and evidence; do not guess.
 
 ## Return
 

@@ -1,5 +1,40 @@
 # Pre-Ship proof
 
+## Contributor instruction audit — 2026-09-05
+
+Bounded local instruction audit, ready for lead Review; this does not change
+the historical r4 Review or pending Ship status below.
+
+Inspected root `AGENTS.md`, all six tracked Project-local `SKILL.md` files,
+the shelf index, audit UI metadata, FastAPI reference, Spec acceptance cases,
+and relevant canonical product, security, ownership, operation, and recovery
+documentation. Live read-only `git ls-remote --symref origin HEAD refs/heads/main`
+matched the local baseline `b6c7702cefbdb2586bb5d1cafe1f77dfaaac64a6`.
+
+Corrections narrow discovery, make startup inspection conditional, remove
+generic Build recipes and repeated documentation declarations, and recognize
+existing bounded fix authority. The six-skill local lifecycle, implicit
+invocation policy, model choices, public-read/authenticated-proposal split,
+Skills privacy hold, and recovery ownership remain intact. References and
+acceptance examples needed no edits. Application code and tests are unchanged.
+
+Validation: all six skills pass the supplied `skill-creator` `quick_validate.py`
+under `/usr/bin/python3`; the default Python lacked PyYAML, so the existing
+system interpreter was used without installation. `npm run docs:check`,
+changed-instruction Prettier checks, `npm test` (6 files / 38 tests),
+`npm run security:check`, and `git diff --check` pass. The security scan used
+the existing static artifact; no fresh artifact or browser proof is claimed.
+
+Manual scenario review covers a mechanical link fix, holistic drift audit,
+accepted-stack behavior change, unresolved trust decision, review-only request,
+authorized local repair, and authorized versus unauthorized Ship. This is
+instruction analysis, not independent model execution. Independent forward
+testing was excluded by the no-subagents scope. No external mutation, private
+Skills read, publication, or deployment occurred. README product and command
+truth remains unchanged; full runtime/release proof is outside this delta.
+
+## Historical application evidence
+
 - Lifecycle: `skills-atlas-remy-github-r3`, contract revision r4.
 - Baseline: `main` at `5efd6ff1f43108030e541411a84ddd6c68451fcd`
   plus the accepted r3.4 work.

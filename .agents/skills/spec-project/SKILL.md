@@ -1,6 +1,6 @@
 ---
 name: spec-project
-description: Audit technical specifications of any maturity or construct the missing contract from rough input for the smallest build-ready technical solution. Use when starting or changing an Application, Service, Automation, Integration, Library, or System and readiness, ownership, boundaries, acceptance, or implementation order must be established without rewriting resolved context.
+description: Establish or audit this Project's build-ready technical contract when material scope, ownership, boundaries, acceptance, or implementation order is unresolved. Preserve accepted context; resolved mechanical edits do not need a new Spec.
 ---
 
 # Project Spec
@@ -50,7 +50,8 @@ resolved business decisions, or create another goal.
 ## Inspect before asking
 
 Read the request, canonical source material, repository instructions, current
-code, interfaces, existing owners, operating evidence, and recovery paths.
+code and interfaces relevant to the delta. Inspect ownership, operating evidence,
+and recovery paths when those dimensions are affected or unresolved.
 Link to canonical sources instead of copying them. Resolve facts through
 inspection; never ask an owner to restate discoverable repository or source
 truth.
@@ -65,6 +66,8 @@ For every required dimension, record one evidence state:
   materially changes the solution.
 - **CONFLICTING:** authoritative sources disagree; cite both and identify who
   can resolve the conflict.
+
+Reuse a cited contract for unchanged dimensions instead of restating its audit.
 
 An inference may enter a READY Build contract only when it is reversible,
 low-risk, and inside the implementer's ordinary technical authority. Never
@@ -171,6 +174,7 @@ Name the exact blocker, cite the evidence, identify the owner who can resolve
 it, and ask at most the one decision question described above. Do not hide
 several questions under one gate.
 
-For a planning-only request, stop after the gate. For acceptance examples that
-exercise all maturity levels, AIOS preservation, and optional profile
-selection, read [examples/acceptance-cases.md](examples/acceptance-cases.md).
+For a planning-only request, stop after the gate. When validating this skill or
+resolving an ambiguous readiness case, use
+[examples/acceptance-cases.md](examples/acceptance-cases.md), which covers input
+maturity, AIOS preservation, and conditional technology selection.

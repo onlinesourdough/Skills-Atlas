@@ -1,6 +1,6 @@
 ---
 name: ship-project
-description: Prepare, release, deploy, activate, and verify a technical solution with a real recovery path. Use after review when publishing an Application, Service, Automation, Integration, Library, or System change, or when changing CI, environments, secrets, migrations, deployment, rollback, replay, or operational ownership.
+description: Deliver, activate, or recover a reviewed Project change within explicit target authority, then verify delivery, recovery, and outcome separately. Use for requested release or operational execution; local CI/configuration edits alone stay in Build and Review.
 ---
 
 # Project Ship
@@ -34,7 +34,8 @@ gave specific authority.
 
 ## Keep delivery proportional
 
-- Install from the lockfile and run the repository's real checks.
+- Build reproducibly from the lockfile and reuse valid evidence for the exact
+  reviewed source; rerun checks affected by artifact or environment changes.
 - Use CI to make required build, test, validation, and security evidence
   repeatable. Automate deployment only when authority, verification, and
   recovery are equally explicit.
@@ -58,7 +59,7 @@ gave specific authority.
 6. Activate only after the gate passes.
 7. Stop, disable, roll back, or recover when verification fails.
 
-Shape-specific proof:
+Select proof for the release unit; do not run every shape's checklist:
 
 - **Application:** real browser journey, assets, server boundaries, and
   rollback or reproducible redeploy.

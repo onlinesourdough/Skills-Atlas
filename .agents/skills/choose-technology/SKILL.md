@@ -1,6 +1,6 @@
 ---
 name: choose-technology
-description: Select the smallest technology after responsibilities, ownership, risks, operation, recovery, and proof are known. Use only for a new or materially changed technology decision; bypass a working stack when the change does not materially alter it, and use the project skill index boundary for concrete specialist gaps.
+description: Resolve a new or materially changed technology decision for this Project from its accepted responsibilities and operating constraints. Skip when the existing stack still fits.
 ---
 
 # Choose Technology
@@ -11,9 +11,9 @@ reason to preload stack-specific skills.
 
 ## Route
 
-1. Run `spec-project` first. The intended result, served party, ownership,
-   boundaries, risks, operation, recovery, and proof must be resolved enough
-   for a Build contract.
+1. Consume the accepted Spec contract. Use `spec-project` only if intended
+   result, served party, ownership, boundaries, risks, operation, recovery, or
+   proof still has a material gap.
 2. If a working stack already owns the responsibilities and the change does
    not materially alter technology, bypass this skill. Record the existing
    stack as the resolved decision and go directly to `build-project`.
