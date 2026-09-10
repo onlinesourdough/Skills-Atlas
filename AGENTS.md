@@ -4,28 +4,36 @@ Build and operate the smallest independent Project that creates this outcome:
 
 > Provide a public-first, self-hostable Skills Atlas that distributes Online Sourdough skills and lets teams inspect, govern, connect, and deploy their own Git-backed skill library safely.
 
+## Shared lifecycle
+
+Use the installed AIOS plugin (0.4.0 or later) for shared procedures:
+`aios-spec-work`, `aios-build-work`, `aios-review-work` and `aios-ship-work`.
+Spec owns conditional technology selection; Review owns generic repository
+health audits. Resolve these skills through the harness, not copied files or
+hardcoded cache paths. This repository owns its requirements, specialist
+methods, checks, release facts and recovery. Keep those facts here and load
+only the phase and local context needed for the change.
+
+Work in the current task by default, including when opened directly from the
+sidebar. Use `aios-orchestrate-workers` only for requested or concretely
+beneficial delegation, or existing-worker recovery. Verify each selected root
+and preserve one writer for overlapping changes. Repository work does not
+preload personal AIOS context. Plugin availability is an authoring capability,
+not a dependency of the product at runtime; if unavailable, report the method
+gap and perform only work adequately covered by the local contract. Do not
+recreate generic skills locally.
+
 ## Start
 
 Read this file and [README.md](README.md), then only the canonical documents
 needed for the requested change. This repository owns an independent lifecycle;
 revisit that boundary only when the change affects ownership. Use the
-project-local Spec when material scope, ownership, boundaries, acceptance, or
+shared AIOS Spec with the local contract when material scope, ownership, boundaries, acceptance, or
 contracts remain unclear. A resolved local mechanical edit needs no new Spec
 or technology decision.
 
 Ask one question only when a missing owner decision materially changes the
 Project. Keep resolved context intact and record technical inferences locally.
-
-## Route
-
-| Work                                                     | Skill                                       |
-| -------------------------------------------------------- | ------------------------------------------- |
-| Technical scope, boundaries, proof, or contracts         | `.agents/skills/spec-project/SKILL.md`      |
-| New or materially changed technology decision            | `.agents/skills/choose-technology/SKILL.md` |
-| Implementation                                           | `.agents/skills/build-project/SKILL.md`     |
-| Correctness, security, simplicity, and proof review      | `.agents/skills/review-project/SKILL.md`    |
-| Authorized delivery, deployment, activation, or recovery | `.agents/skills/ship-project/SKILL.md`      |
-| Periodic whole-repository health check                   | `.agents/skills/audit-project/SKILL.md`     |
 
 The Project-owned shelf and its boundary are indexed in
 [Project-local skills](.agents/skills/README.md). Generic cross-project skill
@@ -35,6 +43,15 @@ Project payload.
 
 Keep one lifecycle record across Spec, Build, Review, revisions, and any
 authorized Ship. The Project repository is canonical after creation.
+
+## Atlas-specific constraints
+
+GitHub owns imported skill content; this Project owns the Atlas application.
+Follow [security](docs/security.md) for current access/proposal policy. Keep
+provider reads bounded, Markdown rendering safe, errors existence-safe and logs
+redacted. Preserve the fictional public fallback and Skills privacy/public-history
+hold. Provider-write proof uses fixtures or interception unless separately
+authorized; never automatically retry writes or delete orphan provider branches.
 
 ## Before completion
 
