@@ -1,102 +1,184 @@
 # Security and permissions
 
-The default posture is public, credential-free, read-only browsing. GitHub
-content remains canonical. Private reads and every provider write require two
-independent server-side conditions: an authenticated Atlas admin session and an
-operator-supplied GitHub credential.
+The personal edition requires server-verified GitHub App user authorization.
+Hosted policy requires active onlinesourdough membership; self-host policy
+requires its configured organization or explicit numeric-user allowlist.
+The separate public demo is credential-free and read-only. GitHub content
+remains canonical; neither client state nor a shared operator token grants access.
 
-## Trust boundaries
+## Identity and session boundary
 
-- Static startup and manual imports make unauthenticated `GET` requests directly
-  to the public GitHub REST API. The static UI has no credential input, bundle
-  value, storage key, cookie, or write endpoint.
-- Node public imports deliberately omit the configured GitHub token. This
-  prevents an unauthenticated browser from probing private repositories through
-  an operator's credential.
-- An authenticated checkout of `onlinesourdough/Skills` was anonymously denied
-  with HTTP 404 on 2026-08-27. It is treated as private/unavailable. Its source
-  bodies and newly observed revision are prohibited from the public bundle;
-  access is possible only through authenticated self-hosted configuration.
-- `ATLAS_ADMIN_PASSWORD` and `GITHUB_TOKEN` are server environment values only.
-  They are never returned, logged, placed in URLs, persisted in browser
-  storage, included in client builds, or accepted by the Plugins form.
-- Admin login creates a random, bounded, in-memory session identified by an
-  `HttpOnly`, `SameSite=Strict` cookie. Restart revokes every session. Login,
-  logout, and proposal requests enforce JSON/origin expectations and fail
-  closed when admin configuration is absent.
-- GitHub provider JSON and browser/API input are untrusted. Repository names,
-  paths, branch/proposal identifiers, response schemas, content sizes, and
-  Markdown are runtime-validated before use.
-- Skill Markdown is preserved in full but rendered without raw HTML. React and
-  the Markdown renderer own text escaping and safe URL handling; source is
-  never executed or inserted with `dangerouslySetInnerHTML`.
+- `oauth4webapi` handles GitHub App OAuth code exchange with S256 PKCE and
+  state validation. Atlas additionally binds the flow to an opaque browser
+  cookie, exact configured callback, ten-minute expiry and atomic one-use D1 row.
+- Login invalidates the presented old session before redirect. Successful
+  exchange creates a new random 256-bit Atlas session; only its SHA-256 hash
+  is stored. User identity is the stable numeric GitHub ID, never a login name
+  or an identity header supplied by the browser.
+- Upstream user tokens and pending PKCE verifiers are AES-GCM encrypted with
+  random IVs and deployment/credential/user or deployment/flow context. App credentials and encryption
+  key remain Worker secrets. Neither tokens nor verifier values reach the UI,
+  logs, exports of source content or client bundles. D1 backups remain sensitive.
+- HTTPS cookies use `__Host-`, Secure, HttpOnly, SameSite=Lax and Path=/.
+  Explicit self-host loopback HTTP development uses a distinct cookie name.
+  Duplicate/invalid cookies fail closed. Origin is pinned to configuration;
+  mutations require exact Origin, and authenticated mutations require CSRF.
+- Session lifetime is the lesser of eight hours and upstream expiry. Refresh
+  upstream GitHub refresh tokens are discarded. Re-login performs fresh identity and policy checks.
+  Missing, malformed, pending, absent, expired, revoked or uncertain authorization
+  fails closed. No frontend ACL substitutes for this boundary.
 
-## Provider reads
+## Read-only agent boundary
 
-Reads accept only `owner/repository` identifiers and exact
-`skills/<safe-slug>/SKILL.md` files. The adapter caps tree entries, accepted
-skills, one file, aggregate decoded bytes, concurrent requests, timeout,
-read-only retries, and response/error text. Truncated trees, malformed provider
-payloads, unsafe paths, duplicate or invalid skills, unavailable/private
-repositories, authentication failure, and rate limits return stable safe codes.
-The active plugin is retained after an import failure.
+Atlas OAuth issues separate resource-bound `atlas:read` access through the
+maintained provider, with S256 PKCE, validated registered redirects, one-use
+consent and explicit numeric-account disclosure. Same-origin CSRF-protected
+approval is required every time. Only a validated consent document adds that
+request's registered callback origin/path to CSP `form-action`; login and other
+documents retain the base policy. CSP does not match query parameters, so OAuth
+continues to enforce the full registered URI. No arbitrary global form destination
+is added. Registration and consent both require a canonical literal host, rejecting
+wildcards, delimiters and controls before CSP construction. Consent rechecks
+previously stored client metadata; callback paths are encoded as source paths.
+HTTPS and exact loopback HTTP hosts and ports remain supported. Public client metadata is text-only and bounded;
+client metadata URLs/icons, external tokens and implicit grants are disabled.
+GitHub tokens and cookies cannot authenticate MCP. Registered redirects are HTTPS
+or loopback HTTP; resource and issuer identify this installation exactly.
 
-Anonymous 404 always becomes `Repository unavailable or private`; status copy,
-logs, and timing policy do not confirm repository existence. The effective
-access label is based on provider repository permissions:
-tokenless public reads are `Read only`; `Can edit` requires a server-token
-response with verified `push: true` inside an authenticated session. Client
-state alone never authorizes a write.
+Requests are capped at 16 KiB, source count at 20, search at one source/20 metadata
+results per page, output at 256 KiB. Oversized explicit reads return an error,
+not silent body truncation. Stateless JSON Streamable HTTP supports current and
+2025-11-25 MCP clients; unsolicited streams/subscriptions are not exposed.
+Tools never write source preferences, metadata or GitHub. Markdown and manifests
+are untrusted data. Search does not return bodies or upload the whole library.
 
-## Pull-request proposal policy
+D1 is authoritative despite KV's eventual consistency. Every read/refresh checks
+active connection, shared credential expiry, deployment policy and fresh GitHub
+user/App access. Final response checks deny in-flight revocation or a lease over
+five minutes. Disconnect deletes one D1 connection; sign out everywhere deletes
+all sessions/connections/credentials/pending consent for that numeric account,
+even when GitHub is unavailable. Browser logout alone preserves agents. Expired
+and unreferenced credentials are pruned on login. New login never revives an old
+connection. Atlas refresh is single-use via bounded hash claims; a failed or lost
+refresh requires re-consent. No upstream token copies or concurrent refresh exist.
 
-`POST /api/proposals` requires an authenticated admin session, configured
-server token, same-origin request, validated repository/path/content/title, and
-a client proposal identifier. Immediately before the first mutation, the
-server re-fetches repository permission and default-branch SHA. It rejects
-permission denial and stale SHA.
+Deep links carry only installation origin, account/source/skill IDs. Login accepts
+only validated internal reader or agent-consent destinations. Account mismatch
+selects no fallback skill; hidden sources require explicit temporary opening and
+do not update visibility. Browser logout still clears private views and history
+restoration must reauthenticate. These IDs/paths are nonsecret but can be private
+metadata, so URLs and imported content remain excluded from runtime logs.
 
-The only allowed sequence is:
+## Provider access and freshness
 
-1. create `refs/heads/atlas/<slug>-<proposal-id>` from the observed default
-   branch SHA;
-2. update exactly one validated `skills/<slug>/SKILL.md` on that branch, using
-   the observed file blob SHA;
-3. open a pull request from the proposal branch to the default branch.
+All authenticated requests recheck GitHub identity and membership/allowlist.
+Imports additionally resolve the repository with that user's GitHub App token:
+effective access is the intersection of the user and App installation.
+Source endpoints query by both user ID and opaque source ID before fetching
+content. Cross-user requests return an unavailable result and cannot inspect
+another user's source. Uninstalled and inaccessible repositories fail closed.
 
-The server never writes the default branch and does not automatically retry a
-write. Duplicate branch, update failure, and pull-request failure are explicit.
-A partial failure may leave an operator-visible orphan branch; automatic
-deletion could remove recoverable work and is therefore excluded.
+Source preview uses the same fresh authenticated read boundary and saves no
+preferences. Confirmation rechecks access and the expected numeric repository
+identity/revision before saving; a changed revision requires another preview.
+Preview bodies remain only in authorized memory and expire with their read lease.
+Cancellation and logout invalidate pending UI results. No provider write occurs.
 
-## HTTP, logging, and operation
+Profile checks verify every saved repository. Read responses carry an
+authorization lease of at most five minutes from the start of the policy check,
+bounded by session expiry. The UI checks every minute while visible, drops
+unavailable sources and locks all content when profile authorization is unknown.
+Hidden-page and persisted-history restoration require a new check. Previously
+authorized content can remain viewable until its lease expires; instant remote
+revocation while offline is not claimed.
 
-Security headers deny framing, MIME sniffing, object/base embedding, and
-cross-origin referrers. Node request logs contain request ID, normalized route,
-status, outcome, and duration—not query strings, headers, cookies, repository
-source, Markdown, passwords, or tokens. Request bodies and provider payloads
-are never logged.
+No skill body is stored in D1, localStorage, sessionStorage, a service worker
+or a shared cache. D1 stores profiles, preferences, encrypted tokens, session
+hashes and expiring flows. API responses are private/no-store. The browser keeps
+only its own authorized snapshots in memory. Source visibility is a persistent
+view preference, not authorization.
 
-The default bind is `127.0.0.1`. A network-exposed operator owns TLS, access
-proxying, password/token rotation, least-privilege GitHub scope, process
-isolation, and environment-file permissions. A public static host owns only the
-credential-free bundle.
+Logout clears the private UI immediately, invalidates pending client work and
+broadcasts to sibling tabs. The server deletes the current session and pending
+browser flows without requiring a working GitHub token. Final session/flow SQL
+predicates reject delayed import or callback completion after logout. A failed
+server sign-out is explicit and retryable. Restores must delete old sessions
+and flows before exposure to avoid resurrecting revoked cookies.
 
-Dependencies are lockfile-pinned and reviewed with full and production audits,
-license evidence, the secret/publish-safety scan, immutable workflow-action
-validation, builds, tests, and browser proof. Canonical startup success and
-provider writes are fixture/mock-proven during r4 Build; no real credential,
-private read, branch, PR, OAuth grant, remote publication, or deployment is
-claimed. Source review keeps unpublished bodies out of bundled data. Static
-artifact scans reject the withheld revision, failed-fetch text, owner-home
-paths, and credential-shaped values while allowing the canonical repository
-identifier required for anonymous startup.
+## Bounded untrusted content
 
-## Residual risk
+Repository names, paths, identities, payload schemas and source sizes are
+runtime-validated. Reads accept only root `skills/<safe-slug>/SKILL.md` and
+`.agents/skills/<safe-slug>/SKILL.md`; known symbolic links are excluded.
+Numeric repository identity and exact path prevent slug/name collisions.
+Manifests only describe supported components; they do not execute code,
+expand shelves, connect MCP or authorize another source.
 
-Tokenless reads inherit GitHub availability and rate limits. An operator can
-grant a token broader rights than the Atlas needs; documentation requires
-least privilege but cannot constrain provider-side scope. In-memory sessions
-are intentionally single-process. Source content can change after a plugin read;
-the proposal's observed SHA check prevents silently writing from stale default
-branch state.
+Tree entries, 100 accepted skills, 128 KiB per skill, 768 KiB aggregate source,
+2 MiB provider responses, concurrency, timeout and GET retries are bounded.
+The shared repository/tree/blob transport counts bytes while streaming, cancels
+on overflow before retaining the excess chunk, and refuses credentialed redirects.
+Server requests supply a User-Agent; anonymous browser reads retain redirect
+support without credentials. Public and deprecated Node imports
+are tokenless. Provider failures return safe codes without raw payloads.
+
+Complete Markdown is rendered without raw HTML or executable source, remote
+images are inert and external links use safe URL handling. Relation evidence
+is capped at 512 records per skill. AST links and metadata carry source evidence;
+names/code/negative prose never imply runtime calls. Unresolved targets do not
+trigger provider reads.
+
+## Writes and retired admin behavior
+
+The Worker always returns read-only packs and denies proposal routes.
+The Node preview ignores former admin/password/token configuration, returns
+410 for legacy login and denies all proposals. It cannot establish a private
+session. Historical proposal adapters and intercepted UI tests remain evidence
+for a future explicitly accepted write policy, not a running second auth product.
+
+Any later proposal capability must freshly verify user/provider write permission
+and source SHA, then create a branch and pull request. It must never write the
+default branch or automatically retry provider writes. C adds no provider grant,
+MCP service or installation action.
+
+## Privacy/public-history hold
+
+An authenticated checkout of the former `onlinesourdough/Skills` was
+anonymously denied on 2026-08-27. Those private bodies and that withheld revision
+remain prohibited from source and public artifacts. On 2026-09-08 the corrected
+`onlinesourdough/Global-Skills` default succeeded through the anonymous adapter;
+see [proof](proof.md). This permits ordinary live public reads, not copying
+the earlier private checkout or declaring its public history remediated.
+The historical hold remains intact.
+
+Synthetic private fixture markers are invented test data only. Production
+Worker/client/static builds must not contain those fixtures, real credentials,
+owner paths or withheld source. Fixture success cannot release the hold.
+
+## Logs, operation and residual risk
+
+Worker security headers deny framing, MIME sniffing and unsafe embedding.
+HTML uses `strict-origin` so native login forms retain a same-origin POST Origin
+while disclosing no path or query in referrers. OAuth, callback and API responses
+use `no-referrer`; missing, null and foreign POST origins remain denied.
+This follows the [Fetch Origin algorithm](https://fetch.spec.whatwg.org/#append-a-request-origin-header):
+`no-referrer` can serialize a native POST Origin as null. The canonical browser
+fixture checks actual form submission, rather than supplying an Origin header.
+Request logs contain event/status/duration only.
+Invocation URL logs and traces are disabled. Never enable callback-query,
+cookie, header, source-ID, Markdown or token logging in adjacent infrastructure.
+
+Operators own separate App selection/credentials, key rotation, HTTPS, D1
+migrations/backups, quotas and access recovery. Each deployment's database and
+config are independent. Default D1 primary reads are used for authorization.
+Provider availability and rate limits remain external dependencies.
+
+Full/production audits, source/artifact scans, runtime tests and browser proof
+support local review. Live GitHub private membership/login, actual hosted
+operation and final browser execution remain unproven until lead verification.
+See [operations](operations.md), [recovery](recovery.md) and [proof](proof.md).
+
+Source inventory results explicitly distinguish a complete empty list from a
+partial or wholly unavailable check with `complete: false` and a generic warning.
+Unavailable repository names and IDs are omitted. Failed global sign-out keeps
+the global operation for Retry while clearing private browser content immediately.

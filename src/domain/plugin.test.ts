@@ -48,9 +48,10 @@ describe("plugin declarations", () => {
   it("resolves the canonical startup repository as read-only provider truth", async () => {
     const live = {
       ...EXAMPLE_PACK,
-      id: "onlinesourdough/skills",
-      repository: "onlinesourdough/Skills",
-      repositoryUrl: "https://github.com/onlinesourdough/Skills",
+      id: "github:101",
+      repositoryId: 101,
+      repository: "onlinesourdough/Global-Skills",
+      repositoryUrl: "https://github.com/onlinesourdough/Global-Skills",
       revision: "1".repeat(40),
       access: "write" as const,
       source: "github" as const,
@@ -66,7 +67,7 @@ describe("plugin declarations", () => {
     expect(result).toEqual({
       status: "ready",
       plugin: expect.objectContaining({
-        repository: "onlinesourdough/Skills",
+        repository: "onlinesourdough/Global-Skills",
         revision: "1".repeat(40),
         access: "read",
         source: "github",
@@ -89,8 +90,9 @@ describe("plugin declarations", () => {
   it("upserts a retried canonical plugin without creating a duplicate", () => {
     const first = {
       ...EXAMPLE_PACK,
-      id: "onlinesourdough/skills",
-      repository: "onlinesourdough/Skills",
+      id: "github:101",
+      repositoryId: 101,
+      repository: "onlinesourdough/Global-Skills",
       source: "github" as const,
     };
     const refreshed = { ...first, revision: "2".repeat(40) };

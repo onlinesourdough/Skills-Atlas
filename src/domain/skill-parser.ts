@@ -12,6 +12,7 @@ export interface ParsedSkill {
   description: string;
   category?: string;
   explicitRelations: string[];
+  relationLine: number;
   body: string;
   markdown: string;
   sourcePath: string;
@@ -40,6 +41,17 @@ export class SkillParseError extends Error {
 
 export function isSafeSkillSlug(slug: string): boolean {
   return slug.length <= MAX_SKILL_SLUG_CHARS && SAFE_SLUG.test(slug);
+}
+
+export function skillSlugFromPath(path: string): string | undefined {
+  const slug = /^(?:skills|\.agents\/skills)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/SKILL\.md$/u.exec(
+    path,
+  )?.[1];
+  return slug && isSafeSkillSlug(slug) ? slug : undefined;
+}
+
+export function githubSkillId(repositoryId: number, path: string): string {
+  return `github:${repositoryId}:${path}`;
 }
 
 function byteLength(value: string): number {
@@ -124,6 +136,21 @@ export function parseSkillMarkdown(source: string, slug: string): ParsedSkill {
   if (fields.metadata !== undefined && !metadata) throw new SkillParseError("invalid-metadata");
   const category = optionalString(fields.category ?? metadata?.category, 80);
   const explicitRelations = relationList(fields.relations ?? metadata?.relations);
+  const relationNode = document.getIn(
+    fields.relations !== undefined ? ["relations"] : ["metadata", "relations"],
+    true,
+  );
+  const relationOffset =
+    relationNode &&
+    typeof relationNode === "object" &&
+    "range" in relationNode &&
+    Array.isArray(relationNode.range)
+      ? relationNode.range[0]
+      : undefined;
+  const relationLine =
+    typeof relationOffset === "number"
+      ? frontmatter.slice(0, relationOffset).split("\n").length + 1
+      : 1;
 
   return {
     slug,
@@ -131,6 +158,7 @@ export function parseSkillMarkdown(source: string, slug: string): ParsedSkill {
     description,
     ...(category ? { category } : {}),
     explicitRelations,
+    relationLine,
     body,
     markdown: source,
     sourcePath: `skills/${slug}/SKILL.md`,

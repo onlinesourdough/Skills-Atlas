@@ -4,27 +4,17 @@ import { lstat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseProposalRequest } from "../src/domain/contracts.js";
 import {
   createGitHubFetchTransport,
   ProviderError,
   type ProviderErrorCode,
-  proposeGitHubChange,
   readGitHubPack,
 } from "../src/domain/github.js";
 import type { AtlasHealth, SessionState } from "../src/types.js";
-import {
-  cookieValue,
-  expiredSessionCookie,
-  SESSION_COOKIE,
-  sessionCookie,
-  SessionStore,
-} from "./session.js";
 
 const clientRoot = fileURLToPath(new URL("../client", import.meta.url));
 const defaultPort = 4173;
 const requestTimeoutMs = 8000;
-const maxJsonBytes = 132 * 1024;
 const securityHeaders = {
   "content-security-policy":
     "default-src 'self'; connect-src 'self'; font-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
@@ -124,38 +114,6 @@ async function sendStatic(response: ServerResponse, route: string): Promise<void
   createReadStream(candidate).pipe(response);
 }
 
-async function readJson(request: IncomingMessage): Promise<unknown> {
-  const contentType = request.headers["content-type"] ?? "";
-  if (!contentType.toLocaleLowerCase().startsWith("application/json")) {
-    throw new Error("content-type");
-  }
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of request) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    total += buffer.length;
-    if (total > maxJsonBytes) throw new Error("body-too-large");
-    chunks.push(buffer);
-  }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
-  } catch {
-    throw new Error("invalid-json");
-  }
-}
-
-function sameOrigin(request: IncomingMessage): boolean {
-  const origin = request.headers.origin;
-  if (!origin) return true;
-  const host = request.headers.host;
-  if (!host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
-
 function providerError(error: unknown): ErrorDescriptor {
   const code: ProviderErrorCode = error instanceof ProviderError ? error.code : "provider-error";
   const descriptors: Partial<Record<ProviderErrorCode, ErrorDescriptor>> = {
@@ -244,25 +202,16 @@ function providerError(error: unknown): ErrorDescriptor {
   );
 }
 
-function serverSessionState(
-  store: SessionStore,
-  authenticated: boolean,
-  providerAvailable: boolean,
-): SessionState {
-  return {
-    kind: "atlas-session",
-    mode: "self-hosted",
-    authenticated,
-    adminAvailable: store.available,
-    providerAvailable,
-  };
-}
+// Deprecated public-only preview. Personal authentication lives in worker/.
+const publicSession: SessionState = {
+  kind: "atlas-session",
+  mode: "self-hosted",
+  authenticated: false,
+  adminAvailable: false,
+  providerAvailable: false,
+};
 
 export function createAtlasServer(config: AtlasRuntimeConfig = {}): Server {
-  const store = new SessionStore(config.adminPassword);
-  const secureCookie = config.secureCookie ?? false;
-  const providerAvailable = Boolean(config.githubToken?.trim());
-
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = requestUrl(request);
     if (!url) {
@@ -270,66 +219,34 @@ export function createAtlasServer(config: AtlasRuntimeConfig = {}): Server {
       return;
     }
     const route = url.pathname;
-    const token = cookieValue(request.headers.cookie, SESSION_COOKIE);
-    const authenticated = store.authenticated(token);
 
     if (route === "/api/health" && request.method === "GET") {
       const health: AtlasHealth = {
         status: "ok",
         mode: "self-hosted",
-        adminConfigured: store.available,
-        githubConfigured: providerAvailable,
-        sessions: "memory",
+        adminConfigured: false,
+        githubConfigured: false,
+        sessions: "none",
       };
       sendJson(response, 200, health);
       return;
     }
     if (route === "/api/session" && request.method === "GET") {
-      sendJson(response, 200, serverSessionState(store, authenticated, providerAvailable));
+      sendJson(response, 200, publicSession);
       return;
     }
-    if (route === "/api/session/login" && request.method === "POST") {
-      if (!sameOrigin(request)) {
-        sendError(response, 403, "origin-denied", "This admin request must be same-origin.");
-        return;
-      }
-      let body: unknown;
-      try {
-        body = await readJson(request);
-      } catch (error) {
-        const code = error instanceof Error ? error.message : "invalid-json";
-        sendError(
-          response,
-          code === "body-too-large" ? 413 : 400,
-          code,
-          "The login request is invalid.",
-        );
-        return;
-      }
-      const password =
-        body && typeof body === "object" ? (body as Record<string, unknown>).password : null;
-      if (typeof password !== "string" || password.length > 512) {
-        sendError(response, 400, "invalid-login", "The login request is invalid.");
-        return;
-      }
-      const session = store.login(password);
-      if (!session) {
-        sendError(response, 401, "login-denied", "Admin sign-in was not accepted.");
-        return;
-      }
-      sendJson(response, 200, serverSessionState(store, true, providerAvailable), {
-        "set-cookie": sessionCookie(session, secureCookie),
-      });
+    if (route === "/api/session/login") {
+      sendError(
+        response,
+        410,
+        "legacy-auth-retired",
+        "Admin authentication is retired. Use the Worker deployment for personal GitHub login.",
+      );
       return;
     }
     if (route === "/api/session" && request.method === "DELETE") {
-      if (!sameOrigin(request)) {
-        sendError(response, 403, "origin-denied", "This admin request must be same-origin.");
-        return;
-      }
-      store.logout(token);
-      sendJson(response, 200, serverSessionState(store, false, providerAvailable), {
-        "set-cookie": expiredSessionCookie(secureCookie),
+      sendJson(response, 200, publicSession, {
+        "set-cookie": "atlas_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0",
       });
       return;
     }
@@ -337,7 +254,6 @@ export function createAtlasServer(config: AtlasRuntimeConfig = {}): Server {
       const repository = url.searchParams.get("repository") ?? "";
       try {
         const transport = createGitHubFetchTransport({
-          ...(authenticated && config.githubToken ? { token: config.githubToken } : {}),
           ...(config.fetcher ? { fetcher: config.fetcher } : {}),
         });
         const pack = await readGitHubPack(transport, repository);
@@ -348,52 +264,13 @@ export function createAtlasServer(config: AtlasRuntimeConfig = {}): Server {
       }
       return;
     }
-    if (route === "/api/proposals" && request.method === "POST") {
-      if (!sameOrigin(request)) {
-        sendError(response, 403, "origin-denied", "This provider write must be same-origin.");
-        return;
-      }
-      if (!authenticated) {
-        sendError(response, 401, "admin-required", "Admin sign-in is required.");
-        return;
-      }
-      if (!config.githubToken) {
-        sendError(
-          response,
-          503,
-          "provider-not-configured",
-          "GitHub write access is not configured.",
-        );
-        return;
-      }
-      let body: unknown;
-      try {
-        body = await readJson(request);
-      } catch (error) {
-        const code = error instanceof Error ? error.message : "invalid-json";
-        sendError(
-          response,
-          code === "body-too-large" ? 413 : 400,
-          code,
-          "The proposal request is invalid.",
-        );
-        return;
-      }
-      const proposal = parseProposalRequest(body);
-      if (!proposal) {
-        sendError(response, 400, "invalid-proposal", "The proposal request is invalid.");
-        return;
-      }
-      try {
-        const transport = createGitHubFetchTransport({
-          token: config.githubToken,
-          ...(config.fetcher ? { fetcher: config.fetcher } : {}),
-        });
-        sendJson(response, 201, await proposeGitHubChange(transport, proposal));
-      } catch (error) {
-        const descriptor = providerError(error);
-        sendError(response, descriptor.status, descriptor.code, descriptor.message);
-      }
+    if (route === "/api/proposals") {
+      sendError(
+        response,
+        401,
+        "legacy-auth-retired",
+        "This deprecated preview is public and read-only.",
+      );
       return;
     }
     if (route === "/api/usage" && request.method === "GET") {
@@ -447,13 +324,7 @@ export function createAtlasServer(config: AtlasRuntimeConfig = {}): Server {
 }
 
 export function startAtlasServer(): Server {
-  const server = createAtlasServer({
-    ...(process.env.ATLAS_ADMIN_PASSWORD
-      ? { adminPassword: process.env.ATLAS_ADMIN_PASSWORD }
-      : {}),
-    ...(process.env.GITHUB_TOKEN ? { githubToken: process.env.GITHUB_TOKEN } : {}),
-    secureCookie: process.env.ATLAS_COOKIE_SECURE === "1",
-  });
+  const server = createAtlasServer();
   const port = portFromEnvironment();
   const host = process.env.HOST?.trim() || "127.0.0.1";
   server.listen(port, host, () => {
@@ -462,8 +333,8 @@ export function startAtlasServer(): Server {
         event: "listening",
         port,
         mode: "self-hosted",
-        adminConfigured: Boolean(process.env.ATLAS_ADMIN_PASSWORD),
-        githubConfigured: Boolean(process.env.GITHUB_TOKEN),
+        adminConfigured: false,
+        githubConfigured: false,
       }),
     );
   });

@@ -12,7 +12,14 @@ import {
   parsePluginManifestComponents,
   PluginManifestError,
 } from "./plugin.js";
-import { MAX_SKILL_BYTES, parseSkillMarkdown, SkillParseError } from "./skill-parser.js";
+import { relationEvidence } from "./relations.js";
+import {
+  githubSkillId,
+  skillSlugFromPath,
+  MAX_SKILL_BYTES,
+  parseSkillMarkdown,
+  SkillParseError,
+} from "./skill-parser.js";
 
 export const MAX_PROVIDER_TREE_ENTRIES = 600;
 export const MAX_PROVIDER_SKILLS = 100;
@@ -68,6 +75,7 @@ export interface GitHubTransport {
 }
 
 interface RepositoryMetadata {
+  id: number;
   fullName: string;
   htmlUrl: string;
   defaultBranch: string;
@@ -84,6 +92,7 @@ interface TreeEntry {
   type: string;
   sha: string;
   size?: number;
+  mode?: string;
 }
 
 function isCanonicalGitHubUrl(value: string, repository: string): boolean {
@@ -139,6 +148,8 @@ async function repositoryMetadata(
   const permissions = record(body?.permissions);
   if (
     !body ||
+    !Number.isSafeInteger(body.id) ||
+    Number(body.id) <= 0 ||
     !fullName ||
     !isRepositoryName(fullName) ||
     !htmlUrl ||
@@ -148,6 +159,7 @@ async function repositoryMetadata(
     throw new ProviderError("provider-payload-invalid");
   }
   return {
+    id: body.id as number,
     fullName,
     htmlUrl,
     defaultBranch,
@@ -171,7 +183,8 @@ async function branchMetadata(
   const tree = record(nestedCommit?.tree);
   const sha = string(commit?.sha, 40);
   const treeSha = string(tree?.sha, 40);
-  if (!sha || !treeSha) throw new ProviderError("provider-payload-invalid");
+  if (!sha || !treeSha || !/^[a-f0-9]{40}$/u.test(sha) || !/^[a-f0-9]{40}$/u.test(treeSha))
+    throw new ProviderError("provider-payload-invalid");
   return { sha, treeSha };
 }
 
@@ -195,10 +208,21 @@ async function repositoryTree(
     const type = string(entry?.type, 20);
     const sha = string(entry?.sha, 40);
     const size = entry?.size;
-    if (!path || !type || !sha || (size !== undefined && typeof size !== "number")) {
+    if (
+      !path ||
+      !type ||
+      !sha ||
+      (size !== undefined && (typeof size !== "number" || !Number.isSafeInteger(size) || size < 0))
+    ) {
       throw new ProviderError("provider-payload-invalid");
     }
-    return { path, type, sha, ...(typeof size === "number" ? { size } : {}) };
+    return {
+      path,
+      type,
+      sha,
+      ...(typeof entry?.mode === "string" ? { mode: entry.mode } : {}),
+      ...(typeof size === "number" ? { size } : {}),
+    };
   });
 }
 
@@ -214,7 +238,7 @@ function base64ToText(
   }
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
   } catch {
     throw new ProviderError(invalidCode);
   }
@@ -264,26 +288,6 @@ function toneFor(slug: string): GraphTone {
   return TONES[total % TONES.length] ?? "blue";
 }
 
-function detectedRelations(markdown: string, available: Set<string>, ownSlug: string): string[] {
-  const relations = new Set<string>();
-  for (const slug of available) {
-    if (slug === ownSlug) continue;
-    const escaped = slug.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-    const explicit = new RegExp(
-      "(?:skills/" +
-        escaped +
-        "/SKILL\\.md|`" +
-        escaped +
-        "`|relations?:[^\\n]*\\b" +
-        escaped +
-        "\\b)",
-      "iu",
-    );
-    if (explicit.test(markdown)) relations.add(slug);
-  }
-  return [...relations];
-}
-
 async function mapWithConcurrency<T, R>(
   items: readonly T[],
   concurrency: number,
@@ -313,8 +317,17 @@ export async function readGitHubPack(
   const tree = await repositoryTree(transport, metadata.fullName, branch.treeSha);
   const skillEntries = tree.filter(
     (entry) =>
-      entry.type === "blob" && /^skills\/[a-z0-9]+(?:-[a-z0-9]+)*\/SKILL\.md$/u.test(entry.path),
+      entry.type === "blob" &&
+      (!entry.mode || entry.mode === "100644" || entry.mode === "100755") &&
+      skillSlugFromPath(entry.path) !== undefined,
   );
+  const acceptedPaths = new Set(skillEntries.map((entry) => entry.path));
+  const skippedSkillFiles = tree.filter(
+    (entry) =>
+      entry.type === "blob" && entry.path.endsWith("/SKILL.md") && !acceptedPaths.has(entry.path),
+  ).length;
+  if (new Set(skillEntries.map((entry) => entry.path)).size !== skillEntries.length)
+    throw new ProviderError("provider-payload-invalid");
   if (skillEntries.length === 0) throw new ProviderError("empty-repository");
   if (skillEntries.length > MAX_PROVIDER_SKILLS) throw new ProviderError("too-many-skills");
 
@@ -355,37 +368,50 @@ export async function readGitHubPack(
     if (aggregateBytes > MAX_PROVIDER_TOTAL_BYTES) {
       throw new ProviderError("aggregate-too-large");
     }
-    const slug = entry.path.split("/")[1] ?? "";
+    const slug = skillSlugFromPath(entry.path) ?? "";
     try {
-      return parseSkillMarkdown(markdown, slug);
+      return { ...parseSkillMarkdown(markdown, slug), sourcePath: entry.path };
     } catch (error) {
       if (error instanceof SkillParseError) throw new ProviderError("invalid-skill");
       throw error;
     }
   });
 
-  const available = new Set(sources.map((source) => source.slug));
   const skills: AtlasSkill[] = sources
     .map((source) => ({
+      id: githubSkillId(metadata.id, source.sourcePath),
       slug: source.slug,
       name: source.name,
       description: source.description,
-      category: source.category ?? "Uncategorised",
+      category: source.category ?? "Uncategorized",
       sourcePath: source.sourcePath,
       markdown: source.markdown,
-      relations: [
-        ...new Set([
-          ...source.explicitRelations.filter((slug) => available.has(slug) && slug !== source.slug),
-          ...detectedRelations(source.markdown, available, source.slug),
-        ]),
-      ],
-      tone: toneFor(source.category ?? "Uncategorised"),
+      relations: [],
+      tone: toneFor(source.category ?? "Uncategorized"),
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
 
+  for (const skill of skills) {
+    const source = sources.find((item) => item.sourcePath === skill.sourcePath)!;
+    try {
+      skill.evidence = relationEvidence(source, skills);
+    } catch (error) {
+      if (error instanceof SkillParseError) throw new ProviderError("invalid-skill");
+      throw error;
+    }
+    skill.relations = [
+      ...new Set(
+        skill.evidence.flatMap((item) =>
+          item.targetId && item.targetId !== skill.id ? [item.targetId] : [],
+        ),
+      ),
+    ];
+  }
+
   return {
     kind: "atlas-pack",
-    id: metadata.fullName.toLocaleLowerCase(),
+    id: `github:${metadata.id}`,
+    repositoryId: metadata.id,
     repository: metadata.fullName,
     repositoryUrl: metadata.htmlUrl,
     defaultBranch: metadata.defaultBranch,
@@ -394,6 +420,7 @@ export async function readGitHubPack(
     source: "github",
     snapshotLabel: `GitHub · ${branch.sha.slice(0, 7)}`,
     components: [...new Set<PluginComponent>(["skills", ...components])],
+    discovery: { skippedSkillFiles },
     skills,
   };
 }
@@ -475,6 +502,40 @@ export async function proposeGitHubChange(
   };
 }
 
+async function boundedProviderText(response: Response): Promise<string> {
+  if (Number(response.headers.get("content-length")) > MAX_PROVIDER_RESPONSE_BYTES) {
+    await response.body?.cancel();
+    throw new ProviderError("provider-payload-invalid");
+  }
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_PROVIDER_RESPONSE_BYTES) throw new ProviderError("provider-payload-invalid");
+      chunks.push(value);
+    }
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      /* Preserve the original stream error. */
+    }
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 export function createGitHubFetchTransport(
   options: {
     token?: string;
@@ -498,17 +559,22 @@ export function createGitHubFetchTransport(
             "x-github-api-version": "2022-11-28",
           };
           if (options.token) headers.authorization = `Bearer ${options.token}`;
+          // Browsers manage their own User-Agent; server runtimes must supply one.
+          if (!("window" in globalThis)) headers["user-agent"] = "Skills-Atlas";
           if (input.body !== undefined) headers["content-type"] = "application/json";
           const response = await fetcher(`${baseUrl}${input.path}`, {
             method: input.method,
             headers,
             signal: controller.signal,
+            ...{ credentials: "omit" as const },
+            redirect: options.token ? "manual" : "follow",
             ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
           });
-          const content = await response.text();
-          if (new TextEncoder().encode(content).byteLength > MAX_PROVIDER_RESPONSE_BYTES) {
-            throw new ProviderError("provider-payload-invalid");
+          if (options.token && response.status >= 300 && response.status < 400) {
+            await response.body?.cancel();
+            throw new ProviderError("permission-denied");
           }
+          const content = await boundedProviderText(response);
           let body: unknown = null;
           if (content) {
             try {

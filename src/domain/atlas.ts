@@ -9,6 +9,10 @@ export function categoriesForSkills(skills: readonly AtlasSkill[]): string[] {
   ];
 }
 
+export function reconcileCategory(skills: readonly AtlasSkill[], category: string): string {
+  return categoriesForSkills(skills).includes(category) ? category : "All skills";
+}
+
 export function filterSkills(
   skills: readonly AtlasSkill[],
   query: string,
@@ -24,6 +28,7 @@ export function filterSkills(
       skill.category,
       skill.slug,
       skill.sourcePath,
+      skill.sourceRepository ?? "",
       skill.markdown,
     ]
       .join(" ")
@@ -32,17 +37,17 @@ export function filterSkills(
   });
 }
 
-export function findSkill(skills: readonly AtlasSkill[], slug: string): AtlasSkill | undefined {
-  return skills.find((skill) => skill.slug === slug);
+export function findSkill(skills: readonly AtlasSkill[], id: string): AtlasSkill | undefined {
+  return skills.find((skill) => skill.id === id);
 }
 
 export interface RelationEdge {
-  startSlug: string;
-  endSlug: string;
+  sourceId: string;
+  targetId: string;
 }
 
 export interface GraphCategoryState {
-  slug: string;
+  id: string;
   emphasized: boolean;
 }
 
@@ -53,22 +58,21 @@ export function graphCategoryEmphasis(
   const selectedCategoryExists = skills.some((skill) => skill.category === category);
   const emphasizeAll = category === "All skills" || !selectedCategoryExists;
   return skills.map((skill) => ({
-    slug: skill.slug,
+    id: skill.id,
     emphasized: emphasizeAll || skill.category === category,
   }));
 }
 
 export function relationEdges(skills: readonly AtlasSkill[]): RelationEdge[] {
-  const loaded = new Set(skills.map((skill) => skill.slug));
+  const loaded = new Set(skills.map((skill) => skill.id));
   const edges = new Map<string, RelationEdge>();
   for (const skill of skills) {
     for (const relation of skill.relations) {
-      if (!loaded.has(relation) || relation === skill.slug) continue;
-      const ascending = skill.slug.localeCompare(relation) <= 0;
-      const startSlug = ascending ? skill.slug : relation;
-      const endSlug = ascending ? relation : skill.slug;
-      const key = `${startSlug}::${endSlug}`;
-      edges.set(key, { startSlug, endSlug });
+      if (!loaded.has(relation) || relation === skill.id) continue;
+      const sourceId = skill.id;
+      const targetId = relation;
+      const key = `${sourceId}::${targetId}`;
+      edges.set(key, { sourceId, targetId });
     }
   }
   return [...edges.entries()]
@@ -82,9 +86,9 @@ export function relationCount(skills: readonly AtlasSkill[]): number {
 
 export function repositoryHealth(skills: readonly AtlasSkill[]): RepositoryHealthSignal[] {
   const inbound = new Set(skills.flatMap((skill) => skill.relations));
-  const missingMetadata = skills.filter((skill) => skill.category === "Uncategorised").length;
+  const missingMetadata = skills.filter((skill) => skill.category === "Uncategorized").length;
   const isolated = skills.filter(
-    (skill) => skill.relations.length === 0 && !inbound.has(skill.slug),
+    (skill) => skill.relations.length === 0 && !inbound.has(skill.id),
   ).length;
   return [
     {
@@ -97,7 +101,7 @@ export function repositoryHealth(skills: readonly AtlasSkill[]): RepositoryHealt
     {
       id: "metadata",
       label: "Missing category metadata",
-      detail: "Skills stay visible as Uncategorised; the Atlas does not invent departments.",
+      detail: "Skills stay visible as Uncategorized; the Atlas does not invent departments.",
       count: missingMetadata,
       severity: missingMetadata > 0 ? "attention" : "good",
     },

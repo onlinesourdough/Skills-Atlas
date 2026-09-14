@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "skills-atlas",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "send_metrics": false,
+  "assets": {
+    "directory": "./dist/worker-client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true,
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "atlas-local",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+  "vars": {
+    "ATLAS_ORIGIN": "http://127.0.0.1:8787",
+    "ATLAS_DEPLOYMENT": "self-hosted",
+    "ATLAS_LOCAL_HTTP": "true",
+    "ATLAS_ALLOWED_ORG": "",
+    "ATLAS_ALLOWED_USER_IDS": "",
+    "ATLAS_DEFAULT_REPOSITORY": "onlinesourdough/Global-Skills",
+    "GITHUB_CLIENT_ID": "",
+  },
+  "secrets": {
+    "required": ["GITHUB_CLIENT_SECRET", "ATLAS_ENCRYPTION_KEY"],
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },
+    "traces": { "enabled": false },
+  },
+}

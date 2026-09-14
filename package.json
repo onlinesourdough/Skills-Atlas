@@ -14,17 +14,17 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.21.1 <23"
   },
   "scripts": {
     "dev": "vite",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:static": "vite build --mode static",
-    "build:server": "tsc -p tsconfig.server.json",
+    "build:server": "node scripts/build-server.mjs",
     "start": "node dist/server/index.js",
     "boot": "npm run build && npm run start",
-    "typecheck": "npm run typecheck:client && npm run typecheck:server",
+    "typecheck": "npm run typecheck:client && npm run typecheck:server && npm run typecheck:worker",
     "typecheck:client": "tsc -p tsconfig.json --noEmit",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "lint": "eslint . --max-warnings=0",
@@ -33,20 +33,39 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview:static": "vite preview --outDir dist/static",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run build:static",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:worker && npm run build && npm run build:static && npm run build:worker",
     "docs:check": "node scripts/check-docs.mjs",
     "security:check": "node scripts/security-check.mjs",
-    "browser:proof": "npm run build && npm run build:static && node scripts/browser-proof.mjs"
+    "browser:proof": "npm run build && npm run build:static && node scripts/browser-proof.mjs",
+    "build:worker:client": "vite build --mode worker",
+    "typecheck:worker": "tsc -p tsconfig.worker.json --noEmit",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
+    "dev:worker": "wrangler dev --local",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "build:worker": "npm run build:worker:client && wrangler deploy --dry-run --outdir dist/worker && node scripts/copy-worker-notices.mjs",
+    "proof:agent": "npm run build:worker:client && node scripts/agent-protocol-proof.mjs",
+    "browser:agent": "npm run build:worker:client && node scripts/browser-agent-proof.mjs",
+    "proof:worker": "npm run build:worker:client && node scripts/local-worker-proof.mjs",
+    "browser:personal": "npm run build:worker:client && node scripts/browser-personal-proof.mjs"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "0.10.3",
+    "@modelcontextprotocol/server": "2.0.0",
+    "oauth4webapi": "3.8.8",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "react-markdown": "10.1.0",
     "remark-gfm": "4.0.1",
-    "yaml": "2.9.0"
+    "remark-parse": "11.0.0",
+    "unified": "11.0.5",
+    "yaml": "2.9.0",
+    "zod": "4.5.4"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.5",
+    "@cloudflare/workers-types": "5.20260908.1",
     "@eslint/js": "10.0.1",
+    "@modelcontextprotocol/client": "2.0.0",
     "@types/node": "22.16.5",
     "@types/react": "19.1.10",
     "@types/react-dom": "19.1.7",
@@ -59,6 +78,7 @@
     "typescript": "5.9.2",
     "typescript-eslint": "8.68.0",
     "vite": "6.4.3",
-    "vitest": "3.2.7"
+    "vitest": "4.1.11",
+    "wrangler": "4.129.1"
   }
 }

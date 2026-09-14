@@ -2,55 +2,67 @@
 
 ## Canonical Project
 
-- Name: Skill Atlas
-- Outcome: provide a public-first, self-hostable interface that helps teams
-  understand and safely improve Git-backed skill libraries.
-- Application source of truth: this repository.
-- Skill-content source of truth: each imported GitHub repository.
-- Lifecycle owner before handoff: project owner at the authorized Ship gate.
-- Runtime owner after an authorized handoff: receiving operator.
+- Application owner: this independent Skill Atlas Project and repository.
+- Skill-content authority: each imported GitHub repository and its owner.
+- Identity/membership/repository-access authority: GitHub, checked server-side.
+- Profile/source-preference authority: this deployment's D1, scoped by numeric user ID.
+- Agent authorization/revocation authority: user consent and D1 active connections;
+  the maintained OAuth provider's KV is protocol storage. The receiving operator
+  owns both bindings, limits, backups and restore invalidation.
+- Lifecycle owner before handoff: project owner through independent lead Review.
+- Runtime owner after authorized handoff: receiving operator.
+- Self-host package/rehearsal owner: this repository's canonical Operations guide
+  and verification scripts. Temporary snapshot/state belongs to the local proof;
+  independent E acceptance remains with the lead. No hosted resource is shared.
 
-The Project owns one independent application lifecycle. An imported repository
-does not own Atlas operation, and Atlas does not become a competing source for
-its skills.
+Atlas does not become a competing skill master store. Imported repositories
+do not own Atlas operation.
 
 ## Responsibilities
 
-| Responsibility                                | Source of truth                                            | Owner                   | Failure or escalation route                               |
-| --------------------------------------------- | ---------------------------------------------------------- | ----------------------- | --------------------------------------------------------- |
-| Outcome and boundaries                        | [spec.md](spec.md)                                         | Project owner role      | AIOS lead before lifecycle/authority change               |
-| Implementation and tests                      | This repository                                            | Build maintainer        | [review.md](review.md) gate                               |
-| Product/design behavior                       | [design.md](design.md)                                     | Build maintainer        | Browser proof and owner Review                            |
-| Public-safe Offline example                   | `src/data/bundled-skills.ts`                               | Build maintainer        | Content/security Review before change                     |
-| Imported skill content                        | Imported GitHub repository                                 | Repository owner        | Provider access or source correction                      |
-| GitHub availability/API behavior              | GitHub                                                     | Receiving operator      | Retain active plugin; inspect provider status/rate limits |
-| Admin password/token scope and rotation       | Operator environment                                       | Receiving operator      | Revoke/rotate, restart, and reauthenticate                |
-| TLS and network access boundary               | Operator infrastructure                                    | Receiving operator      | Access proxy/TLS incident process                         |
-| In-memory sessions and browser plugin state   | Running Node/browser session                               | Receiving operator/user | Restart/reload and re-import                              |
-| Proposal branch/PR review and orphan branches | Imported repository                                        | Repository owner        | GitHub review or authorized cleanup                       |
-| Build, health, logs, and recovery             | [operations.md](operations.md), [recovery.md](recovery.md) | Receiving operator      | Stop/rebuild/restart; retain source truth                 |
-| Static release and GitHub Pages               | `dist/static`, manual workflow, `public/CNAME`             | Project owner role      | Separate Review/Ship authorization                        |
-| Simply DNS CNAME                              | `skills.onlinesourdough.com` → `onlinesourdough.github.io` | Receiving DNS owner     | Ship verification or DNS rollback                         |
+| Responsibility                          | Source of truth                           | Owner                                        | Failure/recovery route                               |
+| --------------------------------------- | ----------------------------------------- | -------------------------------------------- | ---------------------------------------------------- |
+| Outcome and accepted scope              | [spec](spec.md)                           | Project owner / lead                         | Resolve material contract gap                        |
+| Implementation and evidence             | Repository / [proof](proof.md)            | Sole Build worker, independent lead reviewer | Same lifecycle revision                              |
+| Product behavior                        | [design](design.md)                       | Build maintainer                             | Browser proof and owner Review                       |
+| Fictional public demo                   | Bundled example                           | Build maintainer                             | Security/content review                              |
+| Imported skill source                   | GitHub repository                         | Repository owner                             | Correct source or provider access                    |
+| GitHub App configuration and secrets    | Independent operator account/secret store | Receiving operator                           | Revoke/rotate, fresh login                           |
+| Membership and App repository selection | GitHub                                    | Account/repository owner                     | Authorized access correction                         |
+| Sessions and source preferences         | Independent D1                            | Receiving operator and scoped user           | Clear sessions; restore preferences                  |
+| HTTPS, quotas, logs and backups         | Operator infrastructure                   | Receiving operator                           | [Operations](operations.md), [recovery](recovery.md) |
+| Static Pages demo                       | Existing manual workflow/CNAME            | Project owner                                | Separate Review/Ship                                 |
+| Worker delivery or domain cutover       | Reviewed deployment configuration         | Receiving operator / DNS owner               | Separate action-time authority                       |
 
-## Credential and data boundary
+## Data and credential boundary
 
-The receiving operator owns `ATLAS_ADMIN_PASSWORD`, `GITHUB_TOKEN`, environment
-permissions, and least-privilege repository selection. The Build maintainer
-does not receive or record them. Private repository source may exist in process
-memory and the authenticated browser view only after an authorized self-hosted
-read; it must not be copied into the checked-in Offline example, proof records, static
-artifact, or logs.
+The operator owns App client secret, encryption key and database access.
+The Build maintainer neither receives nor records real credentials. A user
+authorizes the App personally; an operator token never substitutes for that user.
+Private source exists only in authorized request/browser memory. D1 persists
+repository preferences and encrypted credentials but no skill body.
 
-The `Offline example` is original fictional product content. It is not exported
-from, attributed to, or inferred from the anonymously unavailable canonical
-repository.
+Backups contain private metadata and encrypted tokens, so operators must protect
+them. Hosted and self-host deployments have separate origins, credentials and
+databases. Restoring preferences requires deleting sessions/flows and fresh login.
 
-## Delivery boundary
+The Offline example is original fictional content, not an export from the
+historically inaccessible Skills source. Its privacy/public-history hold remains
+in [security](security.md) and [proof](proof.md).
 
-Lead Review passed for r4. The project owner owns source publication and the
-later Pages deployment/run, custom-domain, DNS, and TLS verification, which
-remain pending and unverified until their Ship steps.
+## Current delivery boundary
 
-Long-term adoption measurement still has no named owner or window. The product
-therefore makes no usage claim; acceptance is behavior/security evidence in
-[proof.md](proof.md).
+Same outcome `atlas-foundation-2026-09-08`, ACTIVE parent goal
+`01a06c27-8cb3-7fd3-abb7-e2f803e57d98`. A/B has independent lead PASS.
+This sole writer continues C locally; the lead retains browser execution,
+independent Review, GitHub App account actions and all live deployment authority.
+
+Allowed work is local source/tests/docs/dependencies, local fixtures and
+read-only official research. No commit, push, real provider write,
+installation, provisioning, deployment, DNS or D-phase implementation belongs
+to this checkpoint. Live personal authorization remains unproven.
+The retired Node preview is public-only; it is not a second self-host auth owner.
+
+The existing Pages/CNAME route remains the static demo delivery owner until an
+authorized cutover. There is no new live Pages/Worker/DNS/TLS evidence.
+Usage measurement still has no accepted owner/window, so the UI claims no usage.

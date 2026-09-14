@@ -1,0 +1,14 @@
+# Local personal Worker configuration. Copy to ignored .dev.vars.
+# Supply actual values privately; do not commit them or use fixture values.
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+# Standard base64 encoding of 32 cryptographically random bytes.
+ATLAS_ENCRYPTION_KEY=
+# Exactly one self-host policy: organization OR positive numeric GitHub user IDs.
+ATLAS_ALLOWED_ORG=
+ATLAS_ALLOWED_USER_IDS=
+# Local-only exact origin/callback. Production requires HTTPS and LOCAL_HTTP=false.
+ATLAS_ORIGIN=http://127.0.0.1:8787
+ATLAS_DEPLOYMENT=self-hosted
+ATLAS_LOCAL_HTTP=true
+ATLAS_DEFAULT_REPOSITORY=onlinesourdough/Global-Skills

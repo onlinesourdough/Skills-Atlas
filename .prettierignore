@@ -2,3 +2,5 @@
 dist/
 node_modules/
 proof/
+.wrangler/
+worker/env.d.ts

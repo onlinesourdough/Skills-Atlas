@@ -1,0 +1,114 @@
+{
+  "manifestPath": "/Users/gustavanderson/.AIOS/projects/onlinesourdough-skills-atlas/proof/atlas-repository-delta-0c3601cd-6273-458b-b115-e2c92bf6c5db.json",
+  "root": "/Users/gustavanderson/.AIOS/projects/onlinesourdough-skills-atlas",
+  "branch": "main",
+  "head": "f06458f3b15b1074f4aacae2f501f270b3cd3687",
+  "scope": "Repository graph delta: 18 explicit files; earlier dirty work is outside this digest",
+  "sourceDigest": "96f5b5c2cc08cbac985442c6e01174248fc17d4290ef98289ca33142f2e2e4c6",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 12014,
+      "sha256": "b536bc9b96277f453186a3223789c48a88c2a4a65a038ee5221d3fda1f659bb7"
+    },
+    {
+      "path": "docs/design.md",
+      "bytes": 8721,
+      "sha256": "a223f3a1d6649aebf8430cbd6f0a486f6370f1766d90464e0a3dd5df3bb2a9a1"
+    },
+    {
+      "path": "docs/proof.md",
+      "bytes": 108830,
+      "sha256": "917c5f52eccda96424babe0e15c56224beadf1d4527cfe3efbd28e2350f7b261"
+    },
+    {
+      "path": "docs/recovery.md",
+      "bytes": 7886,
+      "sha256": "27615c248bd6cf33b52c708ba385ea39e605783374bfe3799ab1c3e2c4484fc5"
+    },
+    {
+      "path": "docs/review.md",
+      "bytes": 37797,
+      "sha256": "4a66f3efbb60d04cf7d73c0ddfd4e903596bd26f5313281389c190294d2a763c"
+    },
+    {
+      "path": "docs/spec.md",
+      "bytes": 31002,
+      "sha256": "3d7dcad9bad1bbc4ce3ad166751b9c8e8a669ead95826a0b51439de013472f6d"
+    },
+    {
+      "path": "scripts/browser-repository-proof.mjs",
+      "bytes": 9418,
+      "sha256": "632db02f69c96f30602bae48102732fea4b607a288df0d6a55a350558c0b4236"
+    },
+    {
+      "path": "src/app/App.tsx",
+      "bytes": 81387,
+      "sha256": "a6ffa5451ccac8f7330ec683bd2eb894f9e70d9597d24aa544606caaf59db8df"
+    },
+    {
+      "path": "src/app/GraphView.test.ts",
+      "bytes": 2825,
+      "sha256": "29b809c34e482b470017ff8a1d84640136ac1409da86d91360fd9f0cd34321a8"
+    },
+    {
+      "path": "src/app/GraphView.tsx",
+      "bytes": 30380,
+      "sha256": "ba16083970b29be50265f2281b826acd8652e7983061e9981d63351f8a2f2d39"
+    },
+    {
+      "path": "src/domain/graph.ts",
+      "bytes": 8043,
+      "sha256": "c1fc13f253d2a7f7e60338d032ed5395fbedf717a2a2f5631c4e7a8ae147bd0d"
+    },
+    {
+      "path": "src/domain/workspace.fixture.ts",
+      "bytes": 3793,
+      "sha256": "368661e3feac206adbc5ed0ff1cb2484b67d76154efa8c3c77ade2d82423fcb3"
+    },
+    {
+      "path": "src/domain/workspace.test.ts",
+      "bytes": 8983,
+      "sha256": "c685cc913e5ea5d8c3acc330236d5037f47150c323b2a073ec6b3ed16b832bf8"
+    },
+    {
+      "path": "src/domain/workspace.ts",
+      "bytes": 5034,
+      "sha256": "3d9d7d722a9f3b71263a407d448977b7c0f15cbcd8731d0755010d80ca4773be"
+    },
+    {
+      "path": "src/styles.css",
+      "bytes": 61155,
+      "sha256": "8f6335fb8130af5401f871bc93f94029640b7e0cf86de1dc55e10ef4b584673b"
+    },
+    {
+      "path": "src/types.ts",
+      "bytes": 2211,
+      "sha256": "84b63d0e56b60723a23e6e904471788eea758cfe98cc501872c3f5b59987aaf0"
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 771,
+      "sha256": "ca52f409eed4332067187747d7c6be00bd2045ad83b0a1a68ad10d0bcb89d245"
+    },
+    {
+      "path": "vitest.domain.config.ts",
+      "bytes": 464,
+      "sha256": "749556dd8dcae90c0b5cc701381c7e0a624c4048d97a80cc7a0df3e623b4b484"
+    }
+  ],
+  "checks": {
+    "domainAndStaticRender": "69 tests / 10 files PASS",
+    "types": "client/server/Worker PASS (TypeScript only)",
+    "lint": "src and new config/browser driver PASS",
+    "format": "18 files PASS",
+    "documentationLinks": "71 local links in 6 bounded documents PASS",
+    "builds": "client/static PASS, configFile false, fresh empty envDir, sanitized process environment, temp output",
+    "browserDriver": "syntax PASS; execution NOT RUN",
+    "independentReview": "PENDING",
+    "fullWorkerIntegration": "lead clean copy PENDING",
+    "releaseHolds": "unchanged"
+  },
+  "buildOutput": "/tmp/atlas-repository-build-ziIgVs",
+  "recovery": "Reverse only this delta against the prior lead snapshot. Do not reset the dirty worktree to HEAD. No data migration."
+}

@@ -7,7 +7,7 @@ visible before implementation.
 
 ## Development
 
-Use Node 20.19 or newer and the committed lockfile:
+Use Node 22.21.1 (supported range `>=22.21.1 <23`) and the committed lockfile:
 
 ```sh
 npm ci
@@ -28,6 +28,8 @@ npm run security:check
 npm audit --audit-level=high
 npm audit --omit=dev --audit-level=high
 npm run browser:proof
+npm run proof:worker
+npm run browser:personal
 git diff --check
 ```
 

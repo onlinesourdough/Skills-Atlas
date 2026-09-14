@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "proof/**"],
+    ignores: ["dist/**", "node_modules/**", "proof/**", ".wrangler/**", "worker/env.d.ts"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -26,6 +26,13 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
     },
+  },
+  {
+    files: ["worker/**/*.ts", "scripts/fixtures/**/*.ts"],
+    languageOptions: {
+      parserOptions: { projectService: false, project: "./tsconfig.worker.json" },
+    },
+    rules: { "@typescript-eslint/no-floating-promises": "error" },
   },
   {
     files: ["**/*.test.ts"],

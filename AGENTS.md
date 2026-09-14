@@ -71,8 +71,12 @@ path in [docs/recovery.md](docs/recovery.md). Keep secrets and private data out
 of source, logs, exports, and client builds.
 
 GitHub remains canonical for imported skills. Public/static access is read-only;
-private reads require an Atlas admin session and server-only GitHub credential.
-Proposals additionally require verified provider write permission and a fresh
-source SHA, and use a branch plus pull request, never a default-branch write.
+private reads require personal GitHub App authorization through a browser session
+or separately consented read-only agent connection, fresh server-side deployment
+policy and user/App repository access. The accepted C/D contracts in [Spec](docs/spec.md)
+supersedes older shared-admin wording in local lifecycle references. Node admin
+auth is retired and proposals are denied. Any later proposal policy additionally
+requires verified provider write permission and a fresh source SHA, using a
+branch plus pull request, never a default-branch write.
 Preserve the Skills privacy/public-history hold in [security](docs/security.md)
 and [proof](docs/proof.md); fixture success does not release that hold.

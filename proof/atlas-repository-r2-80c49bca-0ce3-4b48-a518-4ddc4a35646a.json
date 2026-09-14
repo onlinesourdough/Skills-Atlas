@@ -1,0 +1,136 @@
+{
+  "manifestPath": "/Users/gustavanderson/.AIOS/projects/onlinesourdough-skills-atlas/proof/atlas-repository-r2-80c49bca-0ce3-4b48-a518-4ddc4a35646a.json",
+  "root": "/Users/gustavanderson/.AIOS/projects/onlinesourdough-skills-atlas",
+  "branch": "main",
+  "head": "f06458f3b15b1074f4aacae2f501f270b3cd3687",
+  "candidate": 2,
+  "parentDigest": "96f5b5c2cc08cbac985442c6e01174248fc17d4290ef98289ca33142f2e2e4c6",
+  "scope": "19-file cumulative repository graph delta; preserves earlier dirty work",
+  "sourceDigest": "ff26a1fb32d0dddcbb3e254261aa1778aa8ebdb02eb8bcebe177433cbaa84193",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 12262,
+      "sha256": "e1738cbb72cc047e398ca3435a55a3af8e6210d6728cc50387e36057fe57344e"
+    },
+    {
+      "path": "docs/design.md",
+      "bytes": 9929,
+      "sha256": "3ff53c32ea3d9075ebf1090b3f5ef5003c6d0bfd55ff0ea35a404cbc9b25ffe7"
+    },
+    {
+      "path": "docs/proof.md",
+      "bytes": 111065,
+      "sha256": "06906ef9670ac075569d9531042f140a3fee560e9bf04669f94213876f21f951"
+    },
+    {
+      "path": "docs/recovery.md",
+      "bytes": 7886,
+      "sha256": "27615c248bd6cf33b52c708ba385ea39e605783374bfe3799ab1c3e2c4484fc5"
+    },
+    {
+      "path": "docs/review.md",
+      "bytes": 39094,
+      "sha256": "ce2fdb144df0892780d1960cd17ce31f3ea4c6ffab095b3dfd6711dfdaf86ff0"
+    },
+    {
+      "path": "docs/spec.md",
+      "bytes": 31862,
+      "sha256": "6d5f6115b23b164bb6060a3589904bea3716376de07a8dc58c892c0e80b0bf3e"
+    },
+    {
+      "path": "scripts/browser-repository-proof.mjs",
+      "bytes": 13474,
+      "sha256": "f03deca674dc73e914f626ab1b0cc9e7a54fbd3e23d87f118d6227e509ef5d6b"
+    },
+    {
+      "path": "src/app/App.tsx",
+      "bytes": 81387,
+      "sha256": "a6ffa5451ccac8f7330ec683bd2eb894f9e70d9597d24aa544606caaf59db8df"
+    },
+    {
+      "path": "src/app/GraphView.test.ts",
+      "bytes": 2825,
+      "sha256": "29b809c34e482b470017ff8a1d84640136ac1409da86d91360fd9f0cd34321a8"
+    },
+    {
+      "path": "src/app/GraphView.tsx",
+      "bytes": 33582,
+      "sha256": "ed5a68ae7f793f5456925ecd715238c8d283f4d775ba35df09dd561ba73d9b76"
+    },
+    {
+      "path": "src/domain/graph.test.ts",
+      "bytes": 7865,
+      "sha256": "d26d9c608f432c7f476aa5462efb11f7052afd00a8d9d209f138fbcd9646a8a9"
+    },
+    {
+      "path": "src/domain/graph.ts",
+      "bytes": 11501,
+      "sha256": "c8eb086266ddcd949bbf357d06458f185652b50da34deb18ed75e6f6c6c577ab"
+    },
+    {
+      "path": "src/domain/workspace.fixture.ts",
+      "bytes": 4022,
+      "sha256": "f3357e15d5c55378cfaf9693da9494c53e27d17ec5d0698300de4f15ad3fcbaa"
+    },
+    {
+      "path": "src/domain/workspace.test.ts",
+      "bytes": 9965,
+      "sha256": "dcc35c2081784f9bc39210710c5d1b1d08ec3773a0ff345228f0faec22c96c82"
+    },
+    {
+      "path": "src/domain/workspace.ts",
+      "bytes": 5439,
+      "sha256": "10fa7b95b99532cd46d662652259afce51d14e65c5464671f8b33da1b159ec54"
+    },
+    {
+      "path": "src/styles.css",
+      "bytes": 62256,
+      "sha256": "89ef7f1defe68de48bfadf1feae6ad46749ee97336f399614b301d07ef9625fd"
+    },
+    {
+      "path": "src/types.ts",
+      "bytes": 2211,
+      "sha256": "84b63d0e56b60723a23e6e904471788eea758cfe98cc501872c3f5b59987aaf0"
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 771,
+      "sha256": "ca52f409eed4332067187747d7c6be00bd2045ad83b0a1a68ad10d0bcb89d245"
+    },
+    {
+      "path": "vitest.domain.config.ts",
+      "bytes": 464,
+      "sha256": "749556dd8dcae90c0b5cc701381c7e0a624c4048d97a80cc7a0df3e623b4b484"
+    }
+  ],
+  "revisionFiles": [
+    "README.md",
+    "docs/design.md",
+    "docs/proof.md",
+    "docs/review.md",
+    "docs/spec.md",
+    "scripts/browser-repository-proof.mjs",
+    "src/app/GraphView.tsx",
+    "src/domain/graph.ts",
+    "src/domain/graph.test.ts",
+    "src/domain/workspace.fixture.ts",
+    "src/domain/workspace.test.ts",
+    "src/domain/workspace.ts",
+    "src/styles.css"
+  ],
+  "checks": {
+    "domainStaticRender": "77 tests / 10 files PASS",
+    "types": "client/server/Worker TypeScript PASS",
+    "lint": "scoped source/config/driver PASS",
+    "syntax": "browser driver PASS",
+    "format": "19 files PASS",
+    "documentationLinks": "71 bounded local links PASS",
+    "builds": "isolated production/static PASS; configFile false, fresh empty envDir, sanitized environment",
+    "buildOutput": "/tmp/atlas-repository-r2-build-YQoBZZ",
+    "browser": "revised default and --uneven assertions prepared, NOT RUN",
+    "fullIntegrationPerformanceVisual": "lead clean-copy execution PENDING",
+    "holds": "unchanged"
+  },
+  "recovery": "Reverse only this revision against reviewed Candidate 1 snapshot; do not reset dirty worktree to HEAD. No data migration."
+}

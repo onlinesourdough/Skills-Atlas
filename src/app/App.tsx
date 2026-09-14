@@ -1,3 +1,4 @@
+import { visibleWorkspace, repositoryColors, repositoryKey } from "../domain/workspace.js";
 import {
   useEffect,
   useMemo,
@@ -5,20 +6,22 @@ import {
   useState,
   type CSSProperties,
   type FormEvent,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
 } from "react";
 import ReactMarkdown from "react-markdown";
+import type { PersonalWorkspace } from "./personal-workspace.js";
+import { GraphView, type GraphFocus } from "./GraphView.js";
+import { TONE_COLORS } from "./tokens.js";
+import { PersonalApiError } from "../domain/personal.js";
 import remarkGfm from "remark-gfm";
 import { EXAMPLE_PACK } from "../data/bundled-skills.js";
 import {
   categoriesForSkills,
+  reconcileCategory,
   filterSkills,
   findSkill,
-  graphCategoryEmphasis,
   relationCount,
-  relationEdges,
   repositoryHealth,
 } from "../domain/atlas.js";
 import { parsePackPayload, parseProposalResult, parseSessionPayload } from "../domain/contracts.js";
@@ -30,7 +33,15 @@ import {
 } from "../domain/github.js";
 import { pluginComponentLabels, resolveDefaultPlugin, upsertPlugin } from "../domain/plugin.js";
 import { parseSkillMarkdown } from "../domain/skill-parser.js";
-import type { AtlasPack, AtlasSkill, GraphTone, ProposalResult, SessionState } from "../types.js";
+import { relativeRepositoryPath } from "../domain/relations.js";
+import type {
+  AtlasPack,
+  AtlasSkill,
+  GraphTone,
+  ImportPreview,
+  ProposalResult,
+  SessionState,
+} from "../types.js";
 
 type ViewName = "graph" | "library" | "usage" | "plugins";
 type ReaderMode = "rendered" | "source";
@@ -77,28 +88,19 @@ const TOUR_PAGES = [
     note: "The repository stays canonical. Skill Atlas makes it easier to understand.",
   },
   {
-    eyebrow: "Inspect and improve",
+    eyebrow: "Inspect the library",
     title: "Work with the library without living in GitHub.",
     description:
-      "Search, read complete skills, follow relationships, and propose an improvement from one calm surface.",
-    note: "Edits become a branch and pull request only when write permission is verified.",
+      "Search, read complete skills, and follow documented references from one calm surface.",
+    note: "Atlas reads GitHub content. Changes follow the repository’s own review process.",
   },
   {
     eyebrow: "Reviewed distribution",
     title: "The current version can reach the whole team.",
-    description:
-      "After review, every supported agent can follow the same Git-backed skill instead of a disconnected copy.",
-    note: "Atlas loads the shared library when GitHub is available and keeps an offline example for recovery.",
+    description: "Each teammate can return to the reviewed GitHub version through the Atlas.",
+    note: "Use a skill through a verified route in your chosen agent environment.",
   },
 ] as const;
-
-const TONE_COLORS: Record<GraphTone, string> = {
-  blue: "#4178c7",
-  mint: "#3e9b82",
-  gold: "#c59624",
-  violet: "#8661b8",
-  clay: "#c55b55",
-};
 
 function viewFromHash(hash: string): ViewName | null {
   const value = hash.slice(1);
@@ -131,7 +133,8 @@ function providerMessage(code: ProviderErrorCode | string): string {
     "too-many-skills": "The repository contains more skills than this Atlas accepts.",
     "skill-too-large": "A skill file is larger than the accepted limit.",
     "aggregate-too-large": "The skill library is larger than the accepted total limit.",
-    "empty-repository": "No skills/<slug>/SKILL.md files were found.",
+    "empty-repository":
+      "No supported skill files found. Use skills/<slug>/SKILL.md or .agents/skills/<slug>/SKILL.md at the repository root.",
     "invalid-skill": "A skill does not meet the bounded Markdown contract.",
     "manifest-too-large": "The plugin manifest is larger than the accepted limit.",
     "invalid-plugin-manifest": "The plugin manifest contains an invalid component declaration.",
@@ -155,11 +158,29 @@ async function responseError(response: Response): Promise<{ code: string; messag
   return { code: "provider-error", message: providerMessage("provider-error") };
 }
 
-function App(): ReactNode {
+function App({
+  personal,
+  demo = false,
+}: { personal?: PersonalWorkspace; demo?: boolean } = {}): ReactNode {
   const [view, setView] = useState<ViewName>(initialView);
-  const [packs, setPacks] = useState<AtlasPack[]>([EXAMPLE_PACK]);
-  const [activePackId, setActivePackId] = useState(EXAMPLE_PACK.id);
-  const [selectedSlug, setSelectedSlug] = useState(EXAMPLE_PACK.skills[0]?.slug ?? "");
+  const [localPacks, setPacks] = useState<AtlasPack[]>([EXAMPLE_PACK]);
+  const [localVisibleIds, setVisibleIds] = useState<string[]>([EXAMPLE_PACK.id]);
+  const packs = personal?.packs ?? localPacks;
+  const visibleIds = personal?.visibleIds ?? localVisibleIds;
+  const openAccount = personal?.onAccount ?? (() => setAccountOpen(true));
+  const [selectedId, setSelectedId] = useState(() =>
+    personal ? "" : (new URLSearchParams(window.location.search).get("skill") ?? ""),
+  );
+  const [graphFocus, setGraphFocus] = useState<GraphFocus>({ serial: 0, center: true });
+  const [fitVersion, setFitVersion] = useState(0);
+  const initiatedSelection = useRef("");
+  useEffect(() => {
+    if (personal?.requestedSkillId !== undefined) {
+      setSelectedId(personal.requestedSkillId);
+      if (personal.requestedSkillId !== initiatedSelection.current)
+        setGraphFocus((current) => ({ serial: current.serial + 1, center: true }));
+    }
+  }, [personal?.requestedSkillId]);
   const [category, setCategory] = useState("All skills");
   const [libraryQuery, setLibraryQuery] = useState("");
   const [readerMode, setReaderMode] = useState<ReaderMode>("rendered");
@@ -177,15 +198,65 @@ function App(): ReactNode {
   const tourReturnRef = useRef<HTMLElement | null>(null);
   const activePackIdRef = useRef(EXAMPLE_PACK.id);
   const defaultAttemptRef = useRef(0);
+  const importEpochRef = useRef(0);
+  const visibilityTouchedRef = useRef(new Set<string>());
+  const manualSourceInteractionRef = useRef(false);
 
-  const activePack = useMemo(
-    () => packs.find((pack) => pack.id === activePackId) ?? EXAMPLE_PACK,
-    [activePackId, packs],
+  const visiblePacks = useMemo(
+    () => packs.filter((pack) => visibleIds.includes(pack.id)),
+    [packs, visibleIds],
+  );
+  const retainedColors = useRef(new Map<string, string>());
+  const sourceColors = useMemo(() => {
+    retainedColors.current = repositoryColors(
+      packs.filter((pack) => pack.source !== "example").map(repositoryKey),
+      retainedColors.current,
+    );
+    // The optional fictional fallback must not consume an imported repository's hue.
+    for (const pack of packs)
+      if (pack.source === "example") retainedColors.current.set(repositoryKey(pack), "#555d68");
+    return retainedColors.current;
+  }, [packs]);
+  const layoutSkills = useMemo(
+    () => visibleWorkspace(visiblePacks, sourceColors),
+    [visiblePacks, sourceColors],
+  );
+  const activePack = useMemo<AtlasPack>(
+    () => ({
+      ...(visiblePacks[0] ?? EXAMPLE_PACK),
+      repository:
+        visiblePacks.length === 1
+          ? visiblePacks[0]!.repository
+          : `${visiblePacks.length} visible sources`,
+      snapshotLabel:
+        visiblePacks.length === 1 ? visiblePacks[0]!.snapshotLabel : "Browser-session selection",
+      skills: layoutSkills,
+    }),
+    [visiblePacks, layoutSkills],
   );
   const selectedSkill = useMemo(
-    () => findSkill(activePack.skills, selectedSlug) ?? activePack.skills[0],
-    [activePack.skills, selectedSlug],
+    () => findSkill(activePack.skills, selectedId),
+    [activePack.skills, selectedId],
   );
+  useEffect(() => {
+    setCategory((current) => reconcileCategory(activePack.skills, current));
+  }, [activePack.skills]);
+  const readerPack = visiblePacks.find((pack) =>
+    pack.skills.some((skill) => skill.id === selectedId),
+  );
+  function toggleSource(pack: AtlasPack): void {
+    if (visibleIds.includes(pack.id) && pack.skills.some((skill) => skill.id === selectedId))
+      selectSkill("");
+    if (personal) {
+      personal.onToggleSource(pack);
+      return;
+    }
+    manualSourceInteractionRef.current = true;
+    visibilityTouchedRef.current.add(pack.id);
+    setVisibleIds((current) =>
+      current.includes(pack.id) ? current.filter((id) => id !== pack.id) : [...current, pack.id],
+    );
+  }
   const filteredSkills = useMemo(
     () => filterSkills(activePack.skills, libraryQuery, category),
     [activePack.skills, category, libraryQuery],
@@ -197,6 +268,10 @@ function App(): ReactNode {
       const next = requested ?? "graph";
       setView(next);
       setDrawerOpen(false);
+      if (!personal) {
+        setSelectedId(new URLSearchParams(window.location.search).get("skill") ?? "");
+        setGraphFocus((current) => ({ serial: current.serial + 1, center: true }));
+      }
       if (!requested) {
         window.history.replaceState(
           null,
@@ -206,12 +281,16 @@ function App(): ReactNode {
       }
     };
     window.addEventListener("hashchange", syncViewFromHash);
+    window.addEventListener("popstate", syncViewFromHash);
     syncViewFromHash();
-    return () => window.removeEventListener("hashchange", syncViewFromHash);
+    return () => {
+      window.removeEventListener("hashchange", syncViewFromHash);
+      window.removeEventListener("popstate", syncViewFromHash);
+    };
   }, []);
 
   useEffect(() => {
-    if (STATIC_EDITION) return;
+    if (STATIC_EDITION || personal || demo) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 2500);
     void fetch("/api/session", { signal: controller.signal })
@@ -232,6 +311,7 @@ function App(): ReactNode {
   }, []);
 
   useEffect(() => {
+    if (personal) return;
     void loadDefaultPlugin();
     return () => {
       defaultAttemptRef.current += 1;
@@ -252,6 +332,7 @@ function App(): ReactNode {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "k") {
         event.preventDefault();
+        setDrawerOpen(false);
         setSearchOpen(true);
       }
     };
@@ -271,22 +352,48 @@ function App(): ReactNode {
   function navigate(next: ViewName): void {
     setView(next);
     setDrawerOpen(false);
-    window.history.replaceState(null, "", `#${next}`);
+    if (viewFromHash(window.location.hash) !== next) {
+      window.history.pushState(null, "", `#${next}`);
+    }
     window.setTimeout(() => mainRef.current?.focus({ preventScroll: true }), 0);
   }
 
-  function openSkill(slug: string): void {
-    setSelectedSlug(slug);
+  function selectSkill(id: string, center = false, destination: ViewName = view): void {
+    if (id && !findSkill(activePack.skills, id)) return;
+    initiatedSelection.current = id;
+    setSelectedId(id);
+    if (id !== selectedId || center)
+      setGraphFocus((current) => ({ serial: current.serial + 1, center }));
     setReaderMode("rendered");
+    const nextView = destination;
+    if (personal) personal.onOpenSkill?.(id, nextView);
+    else {
+      const params = new URLSearchParams(window.location.search);
+      if (id) params.set("skill", id);
+      else params.delete("skill");
+      const query = params.toString();
+      const url = `${window.location.pathname}${query ? `?${query}` : ""}#${nextView}`;
+      if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== url)
+        window.history.pushState(null, "", url);
+    }
+  }
+
+  function openSkill(id: string): void {
+    selectSkill(id, id !== selectedId, "library");
     setLibraryQuery("");
-    setCategory("All skills");
     navigate("library");
   }
 
-  function activatePack(pack: AtlasPack): void {
+  function activatePack(pack: AtlasPack, automatic = false): void {
+    if (personal) {
+      if (!visibleIds.includes(pack.id)) personal.onToggleSource(pack);
+      return;
+    }
+    if (!automatic) manualSourceInteractionRef.current = true;
     activePackIdRef.current = pack.id;
-    setActivePackId(pack.id);
-    setSelectedSlug(pack.skills[0]?.slug ?? "");
+    setVisibleIds((current) => [
+      ...new Set([...current.filter((id) => id !== EXAMPLE_PACK.id), pack.id]),
+    ]);
     setCategory("All skills");
     setLibraryQuery("");
     setReaderMode("rendered");
@@ -294,7 +401,7 @@ function App(): ReactNode {
 
   async function readRepository(repository: string, publicOnly = false): Promise<AtlasPack> {
     let pack: AtlasPack;
-    if (STATIC_EDITION) {
+    if (STATIC_EDITION || demo) {
       pack = await readGitHubPack(createGitHubFetchTransport(), repository);
     } else {
       const response = await fetch(
@@ -322,16 +429,37 @@ function App(): ReactNode {
       setDefaultLoad(result);
       return;
     }
-    setPacks((current) => upsertPlugin(current, result.plugin));
-    if (activePackIdRef.current === EXAMPLE_PACK.id) activatePack(result.plugin);
+    setPacks((current) =>
+      current.some((pack) => pack.id === result.plugin.id)
+        ? current
+        : upsertPlugin(current, result.plugin),
+    );
+    if (!manualSourceInteractionRef.current && activePackIdRef.current === EXAMPLE_PACK.id)
+      activatePack(result.plugin, true);
+    else if (!visibilityTouchedRef.current.has(result.plugin.id))
+      setVisibleIds((current) => [...new Set([...current, result.plugin.id])]);
     setDefaultLoad({ status: "ready" });
   }
 
-  async function importRepository(repository: string): Promise<AtlasPack> {
+  async function previewRepository(repository: string): Promise<ImportPreview> {
+    if (personal) return personal.onPreview(repository);
+    const epoch = importEpochRef.current;
     const pack = await readRepository(repository);
-    defaultAttemptRef.current += 1;
+    if (epoch !== importEpochRef.current) throw new ProviderError("authentication-required");
+    return { pack, authorizedUntil: Date.now() + 300000 };
+  }
+
+  async function importRepository(repository: string, preview: ImportPreview): Promise<AtlasPack> {
+    if (preview.authorizedUntil <= Date.now()) throw new PersonalApiError("preview-changed");
+    if (personal) return personal.onImport(repository, preview);
+    const epoch = importEpochRef.current;
+    const pack = await readRepository(repository);
+    if (epoch !== importEpochRef.current) throw new ProviderError("authentication-required");
+    if (pack.id !== preview.pack.id || pack.revision !== preview.pack.revision)
+      throw new PersonalApiError("preview-changed");
     setPacks((current) => upsertPlugin(current, pack));
-    activatePack(pack);
+    if (!packs.some((item) => item.id === pack.id) && !visibilityTouchedRef.current.has(pack.id))
+      activatePack(pack);
     setDefaultLoad({ status: "ready" });
     return pack;
   }
@@ -384,34 +512,38 @@ function App(): ReactNode {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell view-${view}`}>
       <Topbar
+        inert={drawerOpen}
         view={view}
         session={session}
+        userName={personal?.userName}
         menuRef={menuRef}
         searchRef={searchRef}
         accountRef={accountRef}
         onMenu={() => setDrawerOpen(true)}
         onNavigate={navigate}
         onSearch={() => setSearchOpen(true)}
-        onAccount={() => setAccountOpen(true)}
+        onAccount={openAccount}
         onTour={() => openTour()}
       />
       <div className="shell-body">
         <Sidebar
           pack={activePack}
+          sources={packs}
+          sourceColors={sourceColors}
+          visibleIds={visibleIds}
+          busyIds={personal?.busyIds ?? []}
+          onToggleSource={toggleSource}
           category={category}
           open={drawerOpen}
           view={view}
           onCategory={(next) => {
             setCategory(next);
+            setFitVersion((current) => current + 1);
             setLibraryQuery("");
-            if (next !== "All skills") {
-              const first = activePack.skills.find((skill) => skill.category === next);
-              if (first) setSelectedSlug(first.slug);
-            }
             if (view === "plugins" || view === "usage") navigate("graph");
-            closeDrawer();
+            closeDrawer(drawerOpen);
           }}
           onPlugins={() => navigate("plugins")}
           onClose={() => closeDrawer(true)}
@@ -423,20 +555,34 @@ function App(): ReactNode {
             onClick={() => closeDrawer(true)}
           />
         ) : null}
-        <main id="main" ref={mainRef} className="product-main" tabIndex={-1}>
-          <DefaultLoadStatus state={defaultLoad} onRetry={() => void loadDefaultPlugin()} />
-          {view === "graph" ? (
+        <main id="main" ref={mainRef} className="product-main" tabIndex={-1} inert={drawerOpen}>
+          {personal ? (
+            personal.notice
+          ) : (
+            <DefaultLoadStatus
+              state={defaultLoad}
+              exampleVisible={visibleIds.includes(EXAMPLE_PACK.id)}
+              onRetry={() => void loadDefaultPlugin()}
+            />
+          )}
+          <div className="graph-container" hidden={view !== "graph"}>
             <GraphView
               pack={activePack}
+              sources={visiblePacks}
+              layoutSkills={layoutSkills}
               category={category}
-              selectedSlug={selectedSkill?.slug ?? ""}
-              onSelect={setSelectedSlug}
+              selectedId={selectedSkill?.id ?? ""}
+              focus={graphFocus}
+              fitVersion={fitVersion}
+              onSelect={selectSkill}
               onOpen={openSkill}
             />
-          ) : null}
+          </div>
           {view === "library" ? (
             <LibraryView
               pack={activePack}
+              readerPack={readerPack}
+              sources={visiblePacks}
               session={session}
               query={libraryQuery}
               filteredSkills={filteredSkills}
@@ -445,23 +591,29 @@ function App(): ReactNode {
               onQuery={setLibraryQuery}
               onCategory={setCategory}
               onSelect={(slug) => {
-                setSelectedSlug(slug);
-                setReaderMode("rendered");
+                selectSkill(slug, true, "library");
               }}
               onReaderMode={setReaderMode}
-              onOpenAccount={() => setAccountOpen(true)}
+              onOpenAccount={openAccount}
+              onBackGraph={() => navigate("graph")}
             />
           ) : null}
           {view === "usage" ? <UsageView pack={activePack} /> : null}
           {view === "plugins" ? (
-            <PluginsView
-              packs={packs}
-              activePack={activePack}
-              session={session}
-              onActivate={activatePack}
-              onImport={importRepository}
-              onOpenAccount={() => setAccountOpen(true)}
-            />
+            <div className="source-manager">
+              <PluginsView
+                packs={packs}
+                visibleIds={visibleIds}
+                onToggleSource={toggleSource}
+                session={session}
+                onActivate={activatePack}
+                onImport={importRepository}
+                onPreview={previewRepository}
+                persistent={Boolean(personal)}
+                onOpenAccount={openAccount}
+              />
+              {personal?.sourcesPanel}
+            </div>
           ) : null}
         </main>
       </div>
@@ -483,7 +635,11 @@ function App(): ReactNode {
         onClose={() => setSearchOpen(false)}
         onOpenSkill={(slug) => {
           setSearchOpen(false);
-          openSkill(slug);
+          if (view === "library") openSkill(slug);
+          else {
+            selectSkill(slug, true, "graph");
+            navigate("graph");
+          }
         }}
       />
       <AccountDialog
@@ -491,7 +647,19 @@ function App(): ReactNode {
         session={session}
         returnRef={accountRef}
         onClose={() => setAccountOpen(false)}
-        onSession={setSession}
+        onSession={(next) => {
+          if (session.authenticated && !next.authenticated) {
+            importEpochRef.current += 1;
+            visibilityTouchedRef.current.clear();
+            manualSourceInteractionRef.current = false;
+            setPacks([EXAMPLE_PACK]);
+            setVisibleIds([EXAMPLE_PACK.id]);
+            setSelectedId("");
+            activePackIdRef.current = EXAMPLE_PACK.id;
+            void loadDefaultPlugin();
+          }
+          setSession(next);
+        }}
         onReplay={() => {
           setAccountOpen(false);
           openTour();
@@ -502,8 +670,10 @@ function App(): ReactNode {
 }
 
 function Topbar({
+  inert,
   view,
   session,
+  userName,
   menuRef,
   searchRef,
   accountRef,
@@ -513,8 +683,10 @@ function Topbar({
   onAccount,
   onTour,
 }: {
+  inert: boolean;
   view: ViewName;
   session: SessionState;
+  userName?: string | undefined;
   menuRef: RefObject<HTMLButtonElement | null>;
   searchRef: RefObject<HTMLButtonElement | null>;
   accountRef: RefObject<HTMLButtonElement | null>;
@@ -524,13 +696,15 @@ function Topbar({
   onAccount: () => void;
   onTour: () => void;
 }): ReactNode {
-  const accountLabel = session.authenticated
-    ? "Admin"
-    : session.mode === "self-hosted" && session.adminAvailable
-      ? "Sign in"
-      : "Public";
+  const accountLabel =
+    userName ??
+    (session.authenticated
+      ? "Admin"
+      : session.mode === "self-hosted" && session.adminAvailable
+        ? "Sign in"
+        : "Public");
   return (
-    <header className="topbar">
+    <header className="topbar" inert={inert}>
       <div className="brand-cell">
         <button
           ref={menuRef}
@@ -545,6 +719,7 @@ function Topbar({
           onClick={onTour}
           aria-label="Replay Skill Atlas onboarding"
         >
+          <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="" width="24" height="24" />
           Skill Atlas
         </button>
       </div>
@@ -605,9 +780,11 @@ function Topbar({
 
 function DefaultLoadStatus({
   state,
+  exampleVisible,
   onRetry,
 }: {
   state: DefaultLoadState;
+  exampleVisible: boolean;
   onRetry: () => void;
 }): ReactNode {
   if (state.status === "ready") return null;
@@ -615,8 +792,8 @@ function DefaultLoadStatus({
     state.status === "loading"
       ? "Loading live skills from GitHub…"
       : state.code === "rate-limited"
-        ? "GitHub’s read limit was reached. Showing Offline example."
-        : "Live skills are unavailable. Showing Offline example.";
+        ? `GitHub’s read limit was reached.${exampleVisible ? " Showing Offline example." : " Retry the default source."}`
+        : `Live skills are unavailable.${exampleVisible ? " Showing Offline example." : " Retry the default source."}`;
   return (
     <div className={`default-load-status ${state.status}`} role="status" aria-live="polite">
       <span>
@@ -636,7 +813,17 @@ function Sidebar({
   onCategory,
   onPlugins,
   onClose,
+  sources,
+  sourceColors,
+  visibleIds,
+  busyIds,
+  onToggleSource,
 }: {
+  sources: AtlasPack[];
+  sourceColors: Map<string, string>;
+  visibleIds: string[];
+  busyIds: string[];
+  onToggleSource: (pack: AtlasPack) => void;
   pack: AtlasPack;
   category: string;
   open: boolean;
@@ -646,6 +833,11 @@ function Sidebar({
   onClose: () => void;
 }): ReactNode {
   const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 820px)").matches);
+  const railRef = useRef<HTMLElement>(null);
+  useFocusTrap(railRef, mobile && open);
+  useEffect(() => {
+    if (mobile && open) railRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, [mobile, open]);
   useEffect(() => {
     const query = window.matchMedia("(max-width: 820px)");
     const update = () => setMobile(query.matches);
@@ -661,10 +853,20 @@ function Sidebar({
     if (!categoryTones.has(skill.category)) categoryTones.set(skill.category, skill.tone);
   return (
     <aside
+      ref={railRef}
       className={`taxonomy-rail${open ? " open" : ""}`}
       aria-label="Skill taxonomy"
       aria-hidden={mobile && !open ? true : undefined}
       inert={mobile && !open}
+      role={mobile && open ? "dialog" : undefined}
+      aria-modal={mobile && open ? true : undefined}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }
+      }}
     >
       <div className="rail-mobile-head">
         <strong>Browse</strong>
@@ -672,6 +874,42 @@ function Sidebar({
           <CloseIcon />
         </button>
       </div>
+      {mobile ? (
+        <a
+          className="drawer-source-link"
+          href="https://github.com/onlinesourdough/Skills-Atlas"
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label="View Skills Atlas source on GitHub"
+        >
+          <GitHubIcon /> App source on GitHub
+        </a>
+      ) : null}
+      <section aria-label="Sources" className="source-controls">
+        <h2 className="rail-label">Sources</h2>
+        {sources.map((source) => (
+          <label key={source.id} title={source.repository}>
+            <input
+              type="checkbox"
+              aria-label={source.repository}
+              checked={visibleIds.includes(source.id)}
+              disabled={busyIds.includes(source.id)}
+              onChange={() => onToggleSource(source)}
+            />
+            <i
+              className="source-swatch"
+              aria-hidden="true"
+              style={{ background: sourceColors.get(repositoryKey(source)) }}
+            />
+            <span className="source-name">
+              <strong>
+                {source.repository.split("/").slice(1).join("/") || source.repository}
+              </strong>
+              <small>{source.repository}</small>
+            </span>
+          </label>
+        ))}
+      </section>
       <section aria-labelledby="categories-title">
         <h2 id="categories-title" className="rail-label">
           Categories
@@ -721,311 +959,10 @@ function Sidebar({
   );
 }
 
-interface GraphNodeLayout {
-  skill: AtlasSkill;
-  x: number;
-  y: number;
-}
-
-interface GraphCategoryLayout {
-  category: string;
-  tone: GraphTone;
-  x: number;
-  y: number;
-  radius: number;
-  nodes: GraphNodeLayout[];
-}
-
-function graphLayout(skills: AtlasSkill[]): GraphCategoryLayout[] {
-  const grouped = new Map<string, AtlasSkill[]>();
-  for (const skill of skills)
-    grouped.set(skill.category, [...(grouped.get(skill.category) ?? []), skill]);
-  const categories = [...grouped.entries()];
-  const centers = [
-    { x: 470, y: 190 },
-    { x: 250, y: 350 },
-    { x: 690, y: 350 },
-    { x: 350, y: 555 },
-    { x: 595, y: 555 },
-    { x: 470, y: 380 },
-  ];
-  if (categories.length === 1) centers[0] = { x: 470, y: 365 };
-  if (categories.length === 2) {
-    centers[0] = { x: 320, y: 360 };
-    centers[1] = { x: 620, y: 360 };
-  }
-  return categories.map(([name, group], categoryIndex) => {
-    const center = centers[categoryIndex % centers.length] ?? { x: 470, y: 365 };
-    const radius = Math.max(76, 54 + Math.sqrt(group.length) * 34);
-    const nodes = group.map((skill, index) => {
-      const nodeRadius =
-        group.length === 1
-          ? 0
-          : group.length >= 5
-            ? Math.min(radius - 35, 95)
-            : Math.min(radius - 30, 28 + group.length * 5);
-      const angle = (Math.PI * 2 * index) / group.length - Math.PI / 2;
-      return {
-        skill,
-        x: center.x + Math.cos(angle) * nodeRadius,
-        y: center.y + Math.sin(angle) * nodeRadius,
-      };
-    });
-    return {
-      category: name,
-      tone: group[0]?.tone ?? "blue",
-      x: center.x,
-      y: center.y,
-      radius,
-      nodes,
-    };
-  });
-}
-
-function graphNodeLabel(name: string): string[] {
-  const words = name.trim().split(/\s+/u);
-  if (words.length < 2) return words;
-  const split = Math.ceil(words.length / 2);
-  return [words.slice(0, split).join(" "), words.slice(split).join(" ")];
-}
-
-function GraphView({
-  pack,
-  category,
-  selectedSlug,
-  onSelect,
-  onOpen,
-}: {
-  pack: AtlasPack;
-  category: string;
-  selectedSlug: string;
-  onSelect: (slug: string) => void;
-  onOpen: (slug: string) => void;
-}): ReactNode {
-  const emphasis = useMemo(
-    () =>
-      new Map(
-        graphCategoryEmphasis(pack.skills, category).map((item) => [item.slug, item.emphasized]),
-      ),
-    [category, pack.skills],
-  );
-  const layout = useMemo(() => graphLayout(pack.skills), [pack.skills]);
-  const nodes = layout.flatMap((item) => item.nodes);
-  const nodeBySlug = new Map(nodes.map((node) => [node.skill.slug, node]));
-  const edges = useMemo(() => relationEdges(pack.skills), [pack.skills]);
-  const selected = findSkill(pack.skills, selectedSlug) ?? pack.skills[0];
-  const connected = new Set<string>(selected?.relations ?? []);
-  for (const skill of pack.skills)
-    if (skill.relations.includes(selected?.slug ?? "")) connected.add(skill.slug);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const drag = useRef<{
-    pointerId: number;
-    x: number;
-    y: number;
-    originX: number;
-    originY: number;
-  } | null>(null);
-
-  function startPan(event: ReactPointerEvent<SVGSVGElement>): void {
-    if ((event.target as Element).closest("[data-skill-node]")) return;
-    drag.current = {
-      pointerId: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      originX: pan.x,
-      originY: pan.y,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function movePan(event: ReactPointerEvent<SVGSVGElement>): void {
-    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
-    setPan({
-      x: drag.current.originX + (event.clientX - drag.current.x) / zoom,
-      y: drag.current.originY + (event.clientY - drag.current.y) / zoom,
-    });
-  }
-
-  function stopPan(event: ReactPointerEvent<SVGSVGElement>): void {
-    if (drag.current?.pointerId === event.pointerId) drag.current = null;
-  }
-
-  return (
-    <section className="graph-view" aria-labelledby="graph-title">
-      <header className="view-heading graph-heading">
-        <h1 id="graph-title">Skill relationships</h1>
-        <span>
-          {pack.skills.length} skills · {relationCount(pack.skills)} connections
-        </span>
-      </header>
-      <div className="graph-stage">
-        <div className="graph-controls" aria-label="Graph controls">
-          <button
-            onClick={() => setZoom((value) => Math.min(1.8, value + 0.15))}
-            aria-label="Zoom in"
-          >
-            +
-          </button>
-          <button
-            onClick={() => setZoom((value) => Math.max(0.65, value - 0.15))}
-            aria-label="Zoom out"
-          >
-            −
-          </button>
-          <button
-            onClick={() => {
-              setZoom(1);
-              setPan({ x: 0, y: 0 });
-            }}
-          >
-            Reset
-          </button>
-        </div>
-        {pack.skills.length ? (
-          <svg
-            className="relationship-graph"
-            viewBox="0 0 940 720"
-            role="img"
-            aria-labelledby="graph-svg-title graph-svg-description"
-            onPointerDown={startPan}
-            onPointerMove={movePan}
-            onPointerUp={stopPan}
-            onPointerCancel={stopPan}
-          >
-            <title id="graph-svg-title">Relationship graph for {pack.repository}</title>
-            <desc id="graph-svg-description">
-              Only loaded skills and explicit source relations are shown. Drag to pan and use the
-              controls to zoom.
-            </desc>
-            <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
-              {layout.map((cluster) => (
-                <g
-                  key={cluster.category}
-                  className={`graph-cluster${
-                    category !== "All skills" && cluster.category !== category
-                      ? " category-muted"
-                      : " category-emphasized"
-                  }`}
-                >
-                  <circle
-                    cx={cluster.x}
-                    cy={cluster.y}
-                    r={cluster.radius}
-                    fill={TONE_COLORS[cluster.tone]}
-                  />
-                  <text x={cluster.x} y={cluster.y - cluster.radius - 14} textAnchor="middle">
-                    {cluster.category} · {cluster.nodes.length}
-                  </text>
-                </g>
-              ))}
-              {edges.map((edge) => {
-                const start = nodeBySlug.get(edge.startSlug);
-                const end = nodeBySlug.get(edge.endSlug);
-                if (!start || !end) return null;
-                const active =
-                  selected && (edge.startSlug === selected.slug || edge.endSlug === selected.slug);
-                const categoryMuted =
-                  category !== "All skills" &&
-                  !emphasis.get(edge.startSlug) &&
-                  !emphasis.get(edge.endSlug);
-                return (
-                  <line
-                    key={`${edge.startSlug}-${edge.endSlug}`}
-                    className={`graph-edge${active ? " active" : ""}${
-                      categoryMuted ? " category-muted" : " category-emphasized"
-                    }`}
-                    x1={start.x}
-                    y1={start.y}
-                    x2={end.x}
-                    y2={end.y}
-                  />
-                );
-              })}
-              {nodes.map((node) => {
-                const active = node.skill.slug === selected?.slug;
-                const related = connected.has(node.skill.slug);
-                const categoryMuted = !emphasis.get(node.skill.slug);
-                return (
-                  <g
-                    key={node.skill.slug}
-                    data-skill-node="true"
-                    className={`skill-node${active ? " selected" : ""}${related ? " related" : ""}${
-                      categoryMuted ? " category-muted" : " category-emphasized"
-                    }`}
-                    transform={`translate(${node.x} ${node.y})`}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`${node.skill.name}, ${node.skill.relations.length} outgoing relations`}
-                    onClick={() => onSelect(node.skill.slug)}
-                    onDoubleClick={() => onOpen(node.skill.slug)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        onSelect(node.skill.slug);
-                      }
-                    }}
-                  >
-                    <circle r={active ? 12 : 9} fill={TONE_COLORS[node.skill.tone]} />
-                    <text textAnchor="middle">
-                      {graphNodeLabel(node.skill.name).map((line, index) => (
-                        <tspan key={line} x="0" y={24 + index * 10}>
-                          {line}
-                        </tspan>
-                      ))}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
-        ) : (
-          <EmptyState
-            title="No loaded skills"
-            detail="Import a plugin with valid skill files to build the graph."
-          />
-        )}
-        <div className="mobile-relationship-list" aria-label="Skill relationship list">
-          {pack.skills.map((skill) => (
-            <button
-              key={skill.slug}
-              className={emphasis.get(skill.slug) ? "category-emphasized" : "category-muted"}
-              onClick={() => onOpen(skill.slug)}
-            >
-              <i style={{ "--node": TONE_COLORS[skill.tone] } as CSSProperties} />
-              <span>
-                <strong>{skill.name}</strong>
-                <small>
-                  {skill.relations.length
-                    ? `Links to ${skill.relations.join(", ")}`
-                    : "No explicit relations"}
-                </small>
-              </span>
-              <ArrowIcon />
-            </button>
-          ))}
-        </div>
-        {selected ? (
-          <div className="graph-selection" aria-live="polite">
-            <i style={{ "--node": TONE_COLORS[selected.tone] } as CSSProperties} />
-            <span>
-              <strong>{selected.name}</strong>
-              <small>
-                {connected.size ? `${connected.size} connected skills` : "No explicit relations"}
-              </small>
-            </span>
-            <button onClick={() => onOpen(selected.slug)}>
-              Open in Library <ArrowIcon />
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
 function LibraryView({
   pack,
+  readerPack,
+  sources,
   session,
   query,
   filteredSkills,
@@ -1036,10 +973,13 @@ function LibraryView({
   onSelect,
   onReaderMode,
   onOpenAccount,
+  onBackGraph,
 }: {
   pack: AtlasPack;
   session: SessionState;
   query: string;
+  readerPack: AtlasPack | undefined;
+  sources: AtlasPack[];
   filteredSkills: AtlasSkill[];
   selectedSkill: AtlasSkill | undefined;
   readerMode: ReaderMode;
@@ -1048,9 +988,34 @@ function LibraryView({
   onSelect: (slug: string) => void;
   onReaderMode: (mode: ReaderMode) => void;
   onOpenAccount: () => void;
+  onBackGraph: () => void;
 }): ReactNode {
+  const [reading, setReading] = useState(Boolean(selectedSkill));
+  const libraryRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    setReading(Boolean(selectedSkill));
+  }, [selectedSkill?.id]);
+  useEffect(() => {
+    if (reading && selectedSkill && window.matchMedia("(max-width: 820px)").matches)
+      requestAnimationFrame(() =>
+        libraryRef.current?.querySelector<HTMLElement>("#skill-reader-title")?.focus(),
+      );
+  }, [reading, selectedSkill?.id]);
+  function backToList(): void {
+    setReading(false);
+    requestAnimationFrame(() => {
+      const buttons = libraryRef.current?.querySelectorAll<HTMLButtonElement>(
+        ".skill-list button[data-skill-id]",
+      );
+      [...(buttons ?? [])].find((button) => button.dataset.skillId === selectedSkill?.id)?.focus();
+    });
+  }
   return (
-    <section className="library-view" aria-labelledby="library-title">
+    <section
+      ref={libraryRef}
+      className={`library-view${reading && selectedSkill ? " reading" : ""}`}
+      aria-label="Skill library"
+    >
       <div className="library-index">
         <header className="library-toolbar">
           <h1 id="library-title">Library</h1>
@@ -1068,14 +1033,32 @@ function LibraryView({
           {filteredSkills.length ? (
             filteredSkills.map((skill) => (
               <button
-                key={skill.slug}
-                className={selectedSkill?.slug === skill.slug ? "selected" : ""}
-                onClick={() => onSelect(skill.slug)}
+                key={skill.id}
+                data-skill-id={skill.id}
+                className={selectedSkill?.id === skill.id ? "selected" : ""}
+                onClick={() => {
+                  setReading(true);
+                  onSelect(skill.id);
+                }}
+                aria-current={selectedSkill?.id === skill.id ? "true" : undefined}
               >
                 <i style={{ "--node": TONE_COLORS[skill.tone] } as CSSProperties} />
                 <span>
                   <strong>{skill.name}</strong>
                   <small>{skill.description}</small>
+                  <small>
+                    {
+                      sources.find((source) => source.skills.some((item) => item.id === skill.id))
+                        ?.repository
+                    }{" "}
+                    · {skill.sourcePath}
+                  </small>
+                  <small>
+                    {skill.category} ·{" "}
+                    {skill.sourcePath.startsWith(".agents/")
+                      ? "Repository-local shelf"
+                      : "Distributed shelf"}
+                  </small>
                 </span>
               </button>
             ))
@@ -1092,15 +1075,25 @@ function LibraryView({
           )}
         </div>
       </div>
-      <SkillReader
-        pack={pack}
-        skill={selectedSkill}
-        session={session}
-        mode={readerMode}
-        onMode={onReaderMode}
-        onSelectRelation={onSelect}
-        onOpenAccount={onOpenAccount}
-      />
+      <div className="library-reader">
+        <nav className="reader-navigation" aria-label="Reader navigation">
+          <button className="back-to-list" onClick={backToList}>
+            <BackIcon /> Back to list
+          </button>
+          <button onClick={onBackGraph}>
+            <BackIcon /> Back to graph
+          </button>
+        </nav>
+        <SkillReader
+          pack={{ ...(readerPack ?? pack), skills: pack.skills }}
+          skill={selectedSkill}
+          session={session}
+          mode={readerMode}
+          onMode={onReaderMode}
+          onSelectRelation={onSelect}
+          onOpenAccount={onOpenAccount}
+        />
+      </div>
     </section>
   );
 }
@@ -1140,20 +1133,22 @@ function SkillReader({
     setProposalState("idle");
     setProposalError("");
     setProposalResult(null);
-  }, [skill?.slug, skill?.markdown]);
+  }, [skill?.id, skill?.markdown, pack.revision, pack.access, session.authenticated]);
 
   if (!skill) {
     return (
       <aside className="skill-reader empty-reader">
         <EmptyState
-          title="Choose a skill"
+          title="Select a skill to read"
           detail="Select a library row to read its complete Markdown."
         />
       </aside>
     );
   }
 
-  const canEdit = pack.source === "github" && pack.access === "write" && session.authenticated;
+  const proposalPath = skill.sourcePath.startsWith("skills/");
+  const canEdit =
+    proposalPath && pack.source === "github" && pack.access === "write" && session.authenticated;
 
   async function submitProposal(): Promise<void> {
     try {
@@ -1202,7 +1197,9 @@ function SkillReader({
         <div>
           <div className="reader-title-row">
             <i style={{ "--node": TONE_COLORS[skill.tone] } as CSSProperties} />
-            <h2 id="skill-reader-title">{skill.name}</h2>
+            <h2 id="skill-reader-title" tabIndex={-1}>
+              {skill.name}
+            </h2>
           </div>
           <p>
             {skill.category} <span>·</span> {skill.slug}
@@ -1219,48 +1216,91 @@ function SkillReader({
           >
             <EditIcon /> Propose edit
           </button>
-        ) : pack.access === "write" && !session.authenticated ? (
+        ) : proposalPath && pack.access === "write" && !session.authenticated ? (
           <button className="button secondary compact" onClick={onOpenAccount}>
             Sign in to edit
           </button>
         ) : (
           <span className="reader-access">
-            <LockIcon /> Read only
+            <EyeIcon /> Read only
           </span>
         )}
       </header>
-      <details className="reader-source">
-        <summary>
-          <RepoIcon />
-          <span>
-            {pack.repository} · <code>{skill.sourcePath}</code>
-          </span>
-          <small>{pack.access === "write" ? "Can edit" : "Read only"}</small>
-          <i aria-hidden="true">
-            <ArrowIcon />
-          </i>
-        </summary>
-        <div>
-          <span>
-            Default branch <code>{pack.defaultBranch}</code>
-          </span>
-          <span>
-            Revision <code>{pack.revision.slice(0, 12)}</code>
-          </span>
-        </div>
-      </details>
-      {skill.relations.length ? (
-        <nav className="reader-relations" aria-label="Related skills">
-          <span>Related</span>
-          {skill.relations.map((slug) => (
-            <button key={slug} onClick={() => onSelectRelation(slug)}>
-              {slug}
-            </button>
-          ))}
-        </nav>
-      ) : (
-        <p className="no-relations">No related skills declared.</p>
-      )}
+      <div className="reader-summary">
+        <details className="reader-source">
+          <summary>
+            <RepoIcon />
+            <span>
+              {pack.repository} · <code>{skill.sourcePath}</code>
+            </span>
+            <small>{proposalPath && pack.access === "write" ? "Can edit" : "Read only"}</small>
+            <i aria-hidden="true">
+              <ArrowIcon />
+            </i>
+          </summary>
+          <div>
+            <span>
+              Default branch <code>{pack.defaultBranch}</code>
+            </span>
+            <span>
+              Revision <code>{pack.revision}</code>
+            </span>
+            {pack.repositoryUrl ? (
+              <a
+                href={`${pack.repositoryUrl}/blob/${pack.revision}/${skill.sourcePath}`}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                Read file on GitHub
+              </a>
+            ) : null}
+          </div>
+        </details>
+        {skill.relations.length ? (
+          <nav className="reader-relations" aria-label="Related skills">
+            <span>Related</span>
+            {skill.relations.map((slug) => (
+              <button key={slug} onClick={() => onSelectRelation(slug)}>
+                {findSkill(pack.skills, slug)?.name ?? "Unavailable target"} ·{" "}
+                {findSkill(pack.skills, slug)?.sourceRepository} ·{" "}
+                {findSkill(pack.skills, slug)?.sourcePath}
+              </button>
+            ))}
+          </nav>
+        ) : (
+          <p className="no-relations">No related skills declared.</p>
+        )}
+        {skill.evidence?.length ? (
+          <details className="reader-evidence">
+            <summary>Relation evidence (references, not runtime calls)</summary>
+            <ul>
+              {skill.evidence.map((item, index) => (
+                <li key={index}>
+                  {item.kind === "reference" ? "References" : "Declared relation"}: {item.target} —{" "}
+                  {item.status}
+                  {item.explanation ? ` · ${item.explanation}` : ""}
+                  <small>
+                    {" "}
+                    · {item.sourcePath}:{item.line}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+        {pack.skills.some((item) => item.relations.includes(skill.id)) ? (
+          <nav className="reader-relations" aria-label="Referenced by">
+            <span>Referenced by</span>
+            {pack.skills
+              .filter((item) => item.relations.includes(skill.id))
+              .map((item) => (
+                <button key={item.id} onClick={() => onSelectRelation(item.id)}>
+                  {item.name} · {item.sourceRepository} · {item.sourcePath}
+                </button>
+              ))}
+          </nav>
+        ) : null}
+      </div>
       {editing ? (
         <div className="editor-pane">
           <div className="editor-message">
@@ -1316,7 +1356,7 @@ function SkillReader({
               Full source
             </button>
           </div>
-          <div className="reader-scroll">
+          <div className="reader-scroll" tabIndex={0} aria-label="Complete skill content">
             {proposalState === "success" && proposalResult ? (
               <div className="proposal-success" role="status">
                 <SuccessIcon />
@@ -1336,6 +1376,29 @@ function SkillReader({
                   skipHtml
                   components={{
                     a: ({ href, children }) => {
+                      const path = href ? relativeRepositoryPath(skill.sourcePath, href) : null;
+                      const resolved = skill.evidence?.find(
+                        (item) => item.target === href && item.status === "resolved",
+                      );
+                      const target = resolved
+                        ? findSkill(pack.skills, resolved.targetId ?? "")
+                        : pack.skills.find(
+                            (item) =>
+                              item.sourceRepository === skill.sourceRepository &&
+                              item.sourcePath === path,
+                          );
+                      if (target)
+                        return (
+                          <button onClick={() => onSelectRelation(target.id)}>{children}</button>
+                        );
+                      if (path && pack.repositoryUrl)
+                        href = `${pack.repositoryUrl}/blob/${pack.revision}/${path.split("/").map(encodeURIComponent).join("/")}`;
+                      else if (
+                        !href?.startsWith("https://") &&
+                        !href?.startsWith("http://") &&
+                        !href?.startsWith("mailto:")
+                      )
+                        return <span>{children} (unresolved link)</span>;
                       const external = href?.startsWith("https://") || href?.startsWith("http://");
                       return (
                         <a
@@ -1394,7 +1457,10 @@ function UsageView({ pack }: { pack: AtlasPack }): ReactNode {
         <header>
           <div>
             <h2 id="health-title">Repository health</h2>
-            <p>{pack.skills.length} loaded skill files · source-backed signals only</p>
+            <p>
+              {pack.skills.length} loaded skill {pack.skills.length === 1 ? "file" : "files"} ·
+              source-backed signals only
+            </p>
           </div>
         </header>
         <div className="health-list">
@@ -1421,37 +1487,111 @@ function UsageView({ pack }: { pack: AtlasPack }): ReactNode {
 }
 
 function PluginsView({
+  persistent,
   packs,
-  activePack,
+  visibleIds,
+  onToggleSource,
   session,
   onActivate,
   onImport,
+  onPreview,
   onOpenAccount,
 }: {
+  persistent: boolean;
   packs: AtlasPack[];
-  activePack: AtlasPack;
+  visibleIds: string[];
+  onToggleSource: (pack: AtlasPack) => void;
   session: SessionState;
   onActivate: (pack: AtlasPack) => void;
-  onImport: (repository: string) => Promise<AtlasPack>;
+  onPreview: (repository: string) => Promise<ImportPreview>;
+  onImport: (repository: string, preview: ImportPreview) => Promise<AtlasPack>;
   onOpenAccount: () => void;
 }): ReactNode {
   const [repository, setRepository] = useState("");
-  const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [state, setState] = useState<
+    "idle" | "loading" | "preview" | "saving" | "success" | "error"
+  >("idle");
   const [message, setMessage] = useState("");
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const requestEpoch = useRef(0);
+  const pending = useRef(false);
+  useEffect(
+    () => () => {
+      requestEpoch.current += 1;
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!preview) return;
+    const timer = window.setTimeout(
+      () => {
+        setPreview(null);
+        setState("error");
+        setMessage(
+          "Preview expired. Preview the repository again to check current access and revision.",
+        );
+      },
+      Math.max(0, preview.authorizedUntil - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [preview]);
+
+  function cancelPreview(): void {
+    requestEpoch.current += 1;
+    pending.current = false;
+    setPreview(null);
+    setState("idle");
+    setMessage("");
+  }
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
+    if (pending.current) return;
+    pending.current = true;
+    const attempt = ++requestEpoch.current;
     setState("loading");
+    setPreview(null);
     setMessage("");
     try {
-      const pack = await onImport(repository.trim());
-      setState("success");
-      setMessage(`${pack.repository} imported with ${pack.skills.length} skills.`);
-      setRepository("");
+      const result = await onPreview(repository.trim());
+      if (attempt !== requestEpoch.current) return;
+      setPreview(result);
+      setState("preview");
     } catch (error) {
+      if (attempt !== requestEpoch.current) return;
       const code = error instanceof ProviderError ? error.code : "provider-error";
       setState("error");
-      setMessage(providerMessage(code));
+      setMessage(error instanceof PersonalApiError ? error.message : providerMessage(code));
+    } finally {
+      if (attempt === requestEpoch.current) pending.current = false;
+    }
+  }
+
+  async function confirmImport(): Promise<void> {
+    if (!preview || pending.current) return;
+    pending.current = true;
+    const attempt = ++requestEpoch.current;
+    setState("saving");
+    try {
+      const pack = await onImport(preview.pack.repository, preview);
+      if (attempt !== requestEpoch.current) return;
+      setPreview(null);
+      setState("success");
+      setMessage(
+        `${pack.repository} imported with ${pack.skills.length} ${pack.skills.length === 1 ? "skill" : "skills"}.`,
+      );
+      setRepository("");
+    } catch (error) {
+      if (attempt !== requestEpoch.current) return;
+      setPreview(null);
+      setState("error");
+      setMessage(
+        error instanceof PersonalApiError
+          ? error.message
+          : providerMessage(error instanceof ProviderError ? error.code : "provider-error"),
+      );
+    } finally {
+      if (attempt === requestEpoch.current) pending.current = false;
     }
   }
 
@@ -1469,16 +1609,17 @@ function PluginsView({
         <RepoIcon />
         <p>
           <strong>A plugin is a Git-backed collection.</strong> It includes skills and may declare
-          apps or MCP servers. Atlas shows only what the repository declares. Access determines Read
-          only or Can edit; edits create a branch and pull request.
+          apps or MCP servers. Atlas shows only what the repository declares. Imports are read-only.
+          This Atlas does not install components or write to GitHub.
         </p>
       </div>
       <section className="import-panel" aria-labelledby="import-title">
         <div className="import-copy">
           <h2 id="import-title">Import from GitHub</h2>
           <p>
-            Public repositories work without a credential. Private repositories require self-hosted
-            admin access.
+            {persistent
+              ? "Choose a repository available to your GitHub account and this app."
+              : "Public repositories work without a credential. Use the personal GitHub login edition for private repositories."}
           </p>
         </div>
         <form onSubmit={(event) => void submit(event)}>
@@ -1486,16 +1627,68 @@ function PluginsView({
             <span className="sr-only">GitHub repository</span>
             <input
               value={repository}
-              onChange={(event) => setRepository(event.target.value)}
+              onChange={(event) => {
+                cancelPreview();
+                setRepository(event.target.value);
+              }}
+              disabled={state === "saving"}
               placeholder="owner/repository"
               autoCapitalize="none"
               spellCheck={false}
             />
           </label>
-          <button className="button primary" disabled={state === "loading"}>
-            {state === "loading" ? "Importing…" : "Import repository"}
+          <button className="button primary" disabled={state === "loading" || state === "saving"}>
+            {state === "loading" ? "Reading repository…" : "Preview repository"}
           </button>
         </form>
+        {state === "loading" ? <button onClick={cancelPreview}>Cancel preview</button> : null}
+        {preview ? (
+          <section className="import-preview" aria-label="Repository preview">
+            <h3>{preview.pack.repository}</h3>
+            <p>
+              {preview.pack.skills.length} {preview.pack.skills.length === 1 ? "skill" : "skills"} ·
+              Read only · <code>{preview.pack.revision.slice(0, 12)}</code>
+            </p>
+            <ul>
+              {["skills/", ".agents/skills/"].map((shelf) => {
+                const count = preview.pack.skills.filter((skill) =>
+                  skill.sourcePath.startsWith(shelf),
+                ).length;
+                return count ? (
+                  <li key={shelf}>
+                    <code>{shelf}</code> · {count} {count === 1 ? "skill" : "skills"}
+                  </li>
+                ) : null;
+              })}
+            </ul>
+            <p>
+              {preview.pack.discovery
+                ? `${preview.pack.discovery.skippedSkillFiles} unsupported skill files skipped.`
+                : "Skipped-file count is unavailable for this source."}
+            </p>
+            <p>
+              Confirm to add this source to {persistent ? "your profile" : "this browser session"}.
+              Existing visibility choices are preserved. GitHub content and installations stay in
+              place.
+            </p>
+            <div className="preview-actions">
+              <button
+                className="button secondary"
+                disabled={state === "saving"}
+                onClick={cancelPreview}
+              >
+                Cancel preview
+              </button>
+              <button
+                className="button primary"
+                disabled={state === "saving"}
+                onClick={() => void confirmImport()}
+              >
+                {state === "saving" ? "Importing…" : "Confirm import"}
+              </button>
+            </div>
+          </section>
+        ) : null}
         {state === "error" ? (
           <div className="import-result error" role="alert">
             <AttentionIcon />
@@ -1523,11 +1716,15 @@ function PluginsView({
       <section className="pack-list-section" aria-labelledby="connected-plugins-title">
         <header>
           <h2 id="connected-plugins-title">Your plugins</h2>
-          <p>Imports remain in this browser session. GitHub stays canonical.</p>
+          <p>
+            {persistent
+              ? "Source choices are saved to your profile. GitHub stays canonical."
+              : "Imports remain in this browser session. GitHub stays canonical."}
+          </p>
         </header>
         <div className="pack-list">
           {packs.map((pack) => {
-            const active = pack.id === activePack.id;
+            const active = visibleIds.includes(pack.id);
             const declaredExtensions = pluginComponentLabels(pack).filter(
               (component) => component !== "Skills",
             );
@@ -1547,7 +1744,12 @@ function PluginsView({
                   </div>
                 </div>
                 <p className="plugin-meta">
-                  <span>{pack.skills.length} skills</span>
+                  <span>
+                    {pack.skills.length} {pack.skills.length === 1 ? "skill" : "skills"}
+                  </span>
+                  {pack.skills.some((skill) => skill.sourcePath.startsWith(".agents/")) ? (
+                    <span>Repository-local shelf included</span>
+                  ) : null}
                   {declaredExtensions.map((component) => (
                     <span key={component}>{component}</span>
                   ))}
@@ -1560,7 +1762,7 @@ function PluginsView({
                 <div className="pack-actions">
                   {active ? (
                     <span className="active-pack">
-                      <SuccessIcon /> In use
+                      <button onClick={() => onToggleSource(pack)}>Hide source</button>
                     </span>
                   ) : (
                     <button className="button secondary compact" onClick={() => onActivate(pack)}>
@@ -1795,12 +1997,22 @@ function SearchDialog({
   const ref = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   useDialog(ref, open);
   useFocusTrap(ref, open);
   useEffect(() => {
-    if (open) window.setTimeout(() => inputRef.current?.focus(), 0);
+    if (open) {
+      setActiveIndex(0);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    }
   }, [open]);
   const results = filterSkills(pack.skills, query, "All skills").slice(0, 8);
+  useEffect(() => {
+    if (open)
+      ref.current
+        ?.querySelector<HTMLElement>(`#skill-result-${activeIndex}`)
+        ?.scrollIntoView({ block: "nearest" });
+  }, [open, activeIndex]);
   function close(): void {
     onClose();
     window.setTimeout(() => returnRef.current?.focus(), 0);
@@ -1830,20 +2042,60 @@ function SearchDialog({
         <input
           ref={inputRef}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActiveIndex(0);
+          }}
+          role="combobox"
+          aria-expanded="true"
+          aria-controls="skill-search-results"
+          aria-activedescendant={results[activeIndex] ? `skill-result-${activeIndex}` : undefined}
+          aria-autocomplete="list"
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              setActiveIndex((index) =>
+                results.length
+                  ? (index + (event.key === "ArrowDown" ? 1 : results.length - 1)) % results.length
+                  : 0,
+              );
+            } else if (event.key === "Enter" && results[activeIndex]) {
+              event.preventDefault();
+              onOpenSkill(results[activeIndex].id);
+            }
+          }}
           placeholder="Search skills"
         />
       </label>
-      <div className="search-results" aria-live="polite">
+      <div
+        className="search-results"
+        id="skill-search-results"
+        role="listbox"
+        aria-label="Matching skills"
+      >
         {query && results.length === 0 ? (
-          <EmptyState title="No matching skills" detail="Try a name, phrase, or skills/ path." />
+          <EmptyState
+            title="No matching skills"
+            detail={`Searching ${pack.skills.length} ${pack.skills.length === 1 ? "skill" : "skills"} in visible sources. Try a name, phrase, or path, or change source visibility.`}
+          />
         ) : (
-          results.map((skill) => (
-            <button key={skill.slug} onClick={() => onOpenSkill(skill.slug)}>
+          results.map((skill, index) => (
+            <button
+              key={skill.id}
+              id={`skill-result-${index}`}
+              role="option"
+              aria-selected={activeIndex === index}
+              data-skill-id={skill.id}
+              onFocus={() => setActiveIndex(index)}
+              onClick={() => onOpenSkill(skill.id)}
+            >
               <i style={{ "--node": TONE_COLORS[skill.tone] } as CSSProperties} />
               <span>
                 <strong>{skill.name}</strong>
-                <small>{skill.sourcePath}</small>
+                <small>
+                  {skill.sourceRepository} · {skill.sourcePath}
+                </small>
+                <small className="search-context">{searchContext(skill, query)}</small>
               </span>
               <ArrowIcon />
             </button>
@@ -1855,6 +2107,15 @@ function SearchDialog({
       </footer>
     </dialog>
   );
+}
+
+function searchContext(skill: AtlasSkill, query: string): string {
+  const text = skill.description.toLowerCase().includes(query.toLowerCase())
+    ? skill.description
+    : skill.markdown;
+  const match = query ? text.toLowerCase().indexOf(query.toLowerCase()) : 0;
+  const start = Math.max(0, match - 30);
+  return `${start ? "…" : ""}${text.slice(start, start + 140).replace(/\s+/gu, " ")}${text.length > start + 140 ? "…" : ""}`;
 }
 
 function AccountDialog({
@@ -1873,42 +2134,11 @@ function AccountDialog({
   onReplay: () => void;
 }): ReactNode {
   const ref = useRef<HTMLDialogElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [password, setPassword] = useState("");
-  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
   useDialog(ref, open);
   useFocusTrap(ref, open);
-  useEffect(() => {
-    if (open && session.adminAvailable && !session.authenticated)
-      window.setTimeout(() => inputRef.current?.focus(), 0);
-    if (!open) {
-      setPassword("");
-      setState("idle");
-    }
-  }, [open, session.adminAvailable, session.authenticated]);
   function close(): void {
     onClose();
     window.setTimeout(() => returnRef.current?.focus(), 0);
-  }
-  async function login(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    setState("loading");
-    try {
-      const response = await fetch("/api/session/login", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      if (!response.ok) throw new Error("denied");
-      const parsed = parseSessionPayload(await response.json());
-      if (!parsed) throw new Error("invalid");
-      onSession(parsed);
-      setPassword("");
-      setState("idle");
-    } catch {
-      setState("error");
-    }
   }
   async function logout(): Promise<void> {
     const response = await fetch("/api/session", { method: "DELETE", credentials: "same-origin" });
@@ -1920,8 +2150,8 @@ function AccountDialog({
     : session.mode === "static"
       ? "Public static edition"
       : session.adminAvailable
-        ? "Admin sign in"
-        : "Public self-hosted edition";
+        ? "Admin login retired"
+        : "Public preview edition";
   return (
     <dialog
       ref={ref}
@@ -1969,26 +2199,7 @@ function AccountDialog({
         </div>
       </div>
       {session.adminAvailable && !session.authenticated ? (
-        <form className="account-login" onSubmit={(event) => void login(event)}>
-          <label>
-            <span>Admin password</span>
-            <input
-              ref={inputRef}
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-          {state === "error" ? <p role="alert">Sign-in was not accepted.</p> : null}
-          <button className="button primary" disabled={state === "loading"}>
-            {state === "loading" ? "Signing in…" : "Sign in"}
-          </button>
-          <small>
-            The password is sent only to this self-hosted Node process and is never stored in the
-            browser.
-          </small>
-        </form>
+        <p>Shared admin login is retired. Use the personal GitHub login edition.</p>
       ) : null}
       <footer>
         {session.authenticated ? (
@@ -2037,7 +2248,7 @@ function useDialog(ref: RefObject<HTMLDialogElement | null>, open: boolean): voi
   }, [open, ref]);
 }
 
-function useFocusTrap(ref: RefObject<HTMLDialogElement | null>, open: boolean): void {
+function useFocusTrap(ref: RefObject<HTMLElement | null>, open: boolean): void {
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog || !open) return;
@@ -2126,6 +2337,14 @@ function LockIcon(): ReactNode {
     <Icon>
       <rect x="5" y="10" width="14" height="10" rx="2" />
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </Icon>
+  );
+}
+function EyeIcon(): ReactNode {
+  return (
+    <Icon>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
     </Icon>
   );
 }

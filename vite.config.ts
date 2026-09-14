@@ -5,7 +5,8 @@ export default defineConfig(({ mode }) => ({
   base: mode === "static" ? "./" : "/",
   plugins: [react()],
   build: {
-    outDir: mode === "static" ? "dist/static" : "dist/client",
+    outDir:
+      mode === "static" ? "dist/static" : mode === "worker" ? "dist/worker-client" : "dist/client",
     emptyOutDir: true,
   },
   server: {

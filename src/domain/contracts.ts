@@ -9,11 +9,15 @@ import type {
   SessionState,
 } from "../types.js";
 import {
+  githubSkillId,
+  skillSlugFromPath,
+  parseSkillMarkdown,
   MAX_SKILL_BYTES,
   MAX_SKILL_DESCRIPTION_CHARS,
   MAX_SKILL_SLUG_CHARS,
   isSafeSkillSlug,
 } from "./skill-parser.js";
+import { relationEvidence } from "./relations.js";
 
 const tones: GraphTone[] = ["blue", "mint", "gold", "violet", "clay"];
 const SHA = /^[a-f0-9]{40}$/u;
@@ -31,17 +35,18 @@ function isSkill(value: unknown): value is AtlasSkill {
   if (!value || typeof value !== "object") return false;
   const skill = value as Record<string, unknown>;
   return (
+    isString(skill.id, 400) &&
     isString(skill.slug, MAX_SKILL_SLUG_CHARS) &&
     isSafeSkillSlug(skill.slug) &&
     isString(skill.name, 120) &&
     isString(skill.description, MAX_SKILL_DESCRIPTION_CHARS) &&
     isString(skill.category, 80) &&
     isString(skill.sourcePath, 190) &&
-    skill.sourcePath === `skills/${skill.slug}/SKILL.md` &&
+    skillSlugFromPath(skill.sourcePath) === skill.slug &&
     isString(skill.markdown, MAX_SKILL_BYTES) &&
     Array.isArray(skill.relations) &&
-    skill.relations.length <= 40 &&
-    skill.relations.every((relation) => isString(relation, MAX_SKILL_SLUG_CHARS)) &&
+    skill.relations.length <= 100 &&
+    skill.relations.every((relation) => isString(relation, 400)) &&
     typeof skill.tone === "string" &&
     tones.includes(skill.tone as GraphTone)
   );
@@ -77,7 +82,61 @@ export function parsePackPayload(value: unknown): AtlasPack | null {
     return null;
   }
   if (pack.repositoryUrl !== undefined && !isString(pack.repositoryUrl, 300)) return null;
-  return pack as unknown as AtlasPack;
+  if (pack.discovery !== undefined) {
+    const discovery = pack.discovery as Record<string, unknown> | null;
+    if (
+      !discovery ||
+      typeof discovery !== "object" ||
+      !Number.isSafeInteger(discovery.skippedSkillFiles) ||
+      Number(discovery.skippedSkillFiles) < 0 ||
+      Number(discovery.skippedSkillFiles) > 600
+    )
+      return null;
+  }
+  const parsed = pack as unknown as AtlasPack;
+  if (new Set(parsed.skills.map((skill) => skill.sourcePath)).size !== parsed.skills.length)
+    return null;
+  if (new Set(parsed.skills.map((skill) => skill.id)).size !== parsed.skills.length) return null;
+  if (parsed.source === "github") {
+    if (
+      !Number.isSafeInteger(parsed.repositoryId) ||
+      Number(parsed.repositoryId) <= 0 ||
+      parsed.id !== `github:${parsed.repositoryId}` ||
+      !isRepositoryName(parsed.repository) ||
+      parsed.repositoryUrl !== `https://github.com/${parsed.repository}` ||
+      !SHA.test(parsed.revision) ||
+      parsed.skills.some(
+        (skill) => skill.id !== githubSkillId(parsed.repositoryId!, skill.sourcePath),
+      )
+    )
+      return null;
+  }
+  try {
+    const skills = parsed.skills.map((skill) => {
+      const source = {
+        ...parseSkillMarkdown(skill.markdown, skill.slug),
+        sourcePath: skill.sourcePath,
+      };
+      const evidence = relationEvidence(source, parsed.skills);
+      return {
+        ...skill,
+        name: source.name,
+        description: source.description,
+        category: source.category ?? "Uncategorized",
+        evidence,
+        relations: [
+          ...new Set(
+            evidence.flatMap((item) =>
+              item.targetId && item.targetId !== skill.id ? [item.targetId] : [],
+            ),
+          ),
+        ],
+      };
+    });
+    return { ...parsed, skills };
+  } catch {
+    return null;
+  }
 }
 
 export function parseHealthPayload(value: unknown): AtlasHealth | null {

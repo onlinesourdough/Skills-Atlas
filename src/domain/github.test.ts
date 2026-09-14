@@ -71,6 +71,7 @@ function readResponses(
     } as const);
   return [
     response(200, {
+      id: 101,
       full_name: "public/team-skills",
       html_url: "https://github.com/public/team-skills",
       default_branch: "main",
@@ -160,6 +161,7 @@ describe("GitHub pack reads", () => {
       readGitHubPack(
         new QueueTransport([
           response(200, {
+            id: 101,
             full_name: "public/team-skills",
             html_url: "https://attacker.example/public/team-skills",
             default_branch: "main",
@@ -248,6 +250,73 @@ describe("GitHub pack reads", () => {
 });
 
 describe("GitHub fetch transport", () => {
+  it("cancels chunked overflow at the bound without consuming the remaining stream or retrying", async () => {
+    let pulled = 0;
+    let canceled = false;
+    let attempts = 0;
+    const transport = createGitHubFetchTransport({
+      fetcher: async () => {
+        attempts += 1;
+        return new Response(
+          new ReadableStream(
+            {
+              pull(controller) {
+                pulled += 1;
+                controller.enqueue(new Uint8Array(256 * 1024));
+              },
+              cancel() {
+                canceled = true;
+              },
+            },
+            { highWaterMark: 0 },
+          ),
+        );
+      },
+    });
+    await expect(transport.request({ method: "GET", path: "/chunked" })).rejects.toEqual(
+      new ProviderError("provider-payload-invalid"),
+    );
+    expect(pulled).toBe(MAX_PROVIDER_RESPONSE_BYTES / (256 * 1024) + 1);
+    expect(canceled).toBe(true);
+    expect(attempts).toBe(1);
+  });
+
+  it("sets server request policy and refuses credentialed redirects, retaining public redirects", async () => {
+    const requests: RequestInit[] = [];
+    let canceled = false;
+    const transport = createGitHubFetchTransport({
+      token: "synthetic-test-only",
+      fetcher: async (_url, init) => {
+        requests.push(init!);
+        return new Response(
+          new ReadableStream({
+            cancel() {
+              canceled = true;
+            },
+          }),
+          { status: 302, headers: { location: "https://foreign.invalid/collect" } },
+        );
+      },
+    });
+    await expect(transport.request({ method: "GET", path: "/redirect" })).rejects.toEqual(
+      new ProviderError("permission-denied"),
+    );
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ redirect: "manual", credentials: "omit" });
+    expect(new Headers(requests[0]!.headers).get("user-agent")).toBeTruthy();
+    expect(canceled).toBe(true);
+    const publicTransport = createGitHubFetchTransport({
+      fetcher: async (_url, init) => {
+        expect(init?.redirect).toBe("follow");
+        expect(new Headers(init?.headers).has("authorization")).toBe(false);
+        return Response.json({ ok: true });
+      },
+    });
+    await expect(
+      publicTransport.request({ method: "GET", path: "/public-rename" }),
+    ).resolves.toMatchObject({ status: 200 });
+  });
+
   it("retries a transient GET once but never retries a write", async () => {
     let readAttempts = 0;
     const read = createGitHubFetchTransport({
@@ -299,6 +368,7 @@ describe("GitHub pull-request proposals", () => {
   function proposalReadResponses(push = true): GitHubResponse[] {
     return [
       response(200, {
+        id: 101,
         full_name: "private/team-skills",
         html_url: "https://github.com/private/team-skills",
         default_branch: "main",

@@ -7,6 +7,7 @@ const textExtensions = new Set([
   ".html",
   ".js",
   ".json",
+  ".jsonc",
   ".md",
   ".mjs",
   ".ts",
@@ -14,6 +15,7 @@ const textExtensions = new Set([
   ".txt",
   ".yaml",
   ".yml",
+  ".sql",
 ]);
 const patterns = [
   ["private-key", /-----BEGIN [A-Z ]+ PRIVATE KEY-----/u],
@@ -48,7 +50,10 @@ async function files(directory, excludedDirectories = new Set()) {
   return result;
 }
 
-const sourceFiles = await files(root, new Set([".git", "node_modules", "dist", "proof"]));
+const sourceFiles = await files(
+  root,
+  new Set([".git", "node_modules", "dist", "proof", ".wrangler"]),
+);
 for (const path of sourceFiles) {
   const lines = (await readFile(path, "utf8")).split("\n");
   lines.forEach((line, index) => {
@@ -82,7 +87,7 @@ if (cname !== "skills.onlinesourdough.com") findings.push("invalid-cname public/
 const readme = await requiredText("README.md", "readme");
 for (const target of [
   "https://skills.onlinesourdough.com",
-  "https://github.com/onlinesourdough/Skills",
+  "https://github.com/onlinesourdough/Global-Skills",
   "https://github.com/onlinesourdough/Skills-Atlas",
   "https://github.com/onlinesourdough/Skills-Atlas/issues",
 ]) {
@@ -105,6 +110,10 @@ const staticPatterns = [
   ...patterns,
   ["failed-fetch-output", /curl:[ \t]*\(56\)/iu],
   ["observed-private-revision", /c09f5ca[a-f0-9]*/iu],
+  [
+    "synthetic-private-fixture",
+    /PRIVATE (?:ALICE|BOB) SYNTHETIC CONTENT|fixture-user-token-|fixture-client-secret|\/__fixture\//u,
+  ],
 ];
 
 if (findings.length === 0 || (await stat(staticRoot).catch(() => null))?.isDirectory()) {
@@ -120,12 +129,24 @@ if (findings.length === 0 || (await stat(staticRoot).catch(() => null))?.isDirec
   }
 }
 
+for (const artifact of ["dist/worker-client", "dist/worker"]) {
+  const paths = await files(join(root, artifact)).catch(() => []);
+  if (!paths.length)
+    findings.push(`missing-personal-artifact ${artifact}; run npm run build:worker`);
+  for (const path of paths) {
+    const content = await readFile(path, "utf8");
+    for (const [kind, pattern] of staticPatterns) {
+      if (pattern.test(content)) findings.push(`personal-${kind} ${relative(root, path)}`);
+    }
+  }
+}
+
 if (findings.length) {
   for (const finding of findings) console.error(`MATCH ${finding}`);
   console.error(`FAIL security finding count=${findings.length} (values withheld)`);
   process.exitCode = 1;
 } else {
   console.log(
-    "PASS security scan: source and static artifact contain no known secret, owner-path, failed-fetch, or withheld-revision markers; workflow actions use immutable refs",
+    "PASS security scan: source and public/personal artifacts contain no known secret, owner-path, failed-fetch, withheld-revision or bundled private-fixture markers; workflow actions use immutable refs",
   );
 }

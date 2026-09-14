@@ -1,7 +1,7 @@
 import type { AtlasPack, PluginComponent } from "../types.js";
 
 export const MAX_PLUGIN_MANIFEST_BYTES = 32 * 1024;
-export const DEFAULT_PLUGIN_REPOSITORY = "onlinesourdough/Skills";
+export const DEFAULT_PLUGIN_REPOSITORY = "onlinesourdough/Global-Skills";
 
 export type DefaultPluginResult =
   | { status: "ready"; plugin: AtlasPack }
@@ -82,6 +82,9 @@ function providerCode(error: unknown): string {
 function isCanonicalDefault(plugin: AtlasPack): boolean {
   if (
     plugin.source !== "github" ||
+    !Number.isSafeInteger(plugin.repositoryId) ||
+    Number(plugin.repositoryId) <= 0 ||
+    plugin.id !== `github:${plugin.repositoryId}` ||
     plugin.repository.toLocaleLowerCase() !== DEFAULT_PLUGIN_REPOSITORY.toLocaleLowerCase() ||
     !plugin.repositoryUrl
   ) {
@@ -92,6 +95,11 @@ function isCanonicalDefault(plugin: AtlasPack): boolean {
     return (
       url.protocol === "https:" &&
       url.hostname === "github.com" &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      !url.search &&
+      !url.hash &&
       url.pathname.replace(/\/$/u, "").toLocaleLowerCase() ===
         `/${DEFAULT_PLUGIN_REPOSITORY}`.toLocaleLowerCase()
     );

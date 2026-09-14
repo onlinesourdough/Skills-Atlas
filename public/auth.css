@@ -1,0 +1,101 @@
+@font-face {
+  font-family: "Geist Sans";
+  src: url("fonts/geist-sans-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("fonts/geist-mono-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+.auth-page {
+  margin: 0;
+  min-height: 100dvh;
+  background: #f8f2e8;
+  color: #2b1b12;
+  font:
+    15px/1.6 "Geist Sans",
+    Arial,
+    sans-serif;
+  overflow: auto;
+}
+.auth-card {
+  box-sizing: border-box;
+  width: min(600px, calc(100% - 32px));
+  margin: 10vh auto;
+  padding: 32px;
+  border: 1px solid #e5d7c6;
+  border-radius: 10px;
+  background: #fffdf7;
+  overflow-wrap: anywhere;
+}
+.auth-card .auth-brand {
+  color: #665345;
+  font-size: 13px;
+  font-weight: 650;
+}
+.auth-card h1 {
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+.auth-card code {
+  font-family: "Geist Mono", monospace;
+  font-size: 13px;
+}
+.auth-card form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+.auth-card button,
+.auth-card a {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #5a3d30;
+  border-radius: 6px;
+  background: #5a3d30;
+  color: #fffdf7;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.auth-card button[name="decision"][value="cancel"] {
+  background: #fffdf7;
+  color: #5a3d30;
+}
+.auth-card :focus-visible {
+  outline: 3px solid #2b6f98;
+  outline-offset: 3px;
+}
+.auth-card dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 16px;
+}
+.auth-card dt {
+  color: #665345;
+}
+.auth-card dd {
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .auth-card {
+    margin: 24px auto;
+    padding: 24px;
+  }
+  .auth-card dl {
+    display: block;
+  }
+  .auth-card dd {
+    margin-bottom: 12px;
+  }
+}

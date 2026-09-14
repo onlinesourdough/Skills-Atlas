@@ -4,6 +4,11 @@ export type GraphTone = "blue" | "mint" | "gold" | "violet" | "clay";
 export type PluginComponent = "skills" | "apps" | "mcpServers";
 
 export interface AtlasSkill {
+  id: string;
+  sourceRepository?: string;
+  sourceKey?: string;
+  sourceRevision?: string;
+  sourceColor?: string;
   slug: string;
   name: string;
   description: string;
@@ -11,13 +16,25 @@ export interface AtlasSkill {
   sourcePath: string;
   markdown: string;
   relations: string[];
+  evidence?: RelationEvidence[];
   tone: GraphTone;
+}
+
+export interface RelationEvidence {
+  kind: "reference" | "declared-relation";
+  sourcePath: string;
+  line: number;
+  target: string;
+  targetId?: string;
+  explanation?: string;
+  status: "resolved" | "unresolved" | "ambiguous";
 }
 
 export interface AtlasPack {
   kind: "atlas-pack";
   id: string;
   repository: string;
+  repositoryId?: number;
   repositoryUrl?: string;
   defaultBranch: string;
   revision: string;
@@ -26,6 +43,12 @@ export interface AtlasPack {
   snapshotLabel: string;
   components: PluginComponent[];
   skills: AtlasSkill[];
+  discovery?: { skippedSkillFiles: number };
+}
+
+export interface ImportPreview {
+  pack: AtlasPack;
+  authorizedUntil: number;
 }
 
 export interface AtlasSnapshot {
@@ -39,7 +62,7 @@ export interface AtlasHealth {
   mode: "self-hosted";
   adminConfigured: boolean;
   githubConfigured: boolean;
-  sessions: "memory";
+  sessions: "none";
 }
 
 export interface SessionState {

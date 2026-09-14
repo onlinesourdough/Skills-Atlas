@@ -151,13 +151,14 @@ const EXAMPLE_SOURCES: ExampleSource[] = [
 function exampleSkill(source: ExampleSource): AtlasSkill {
   const parsed = parseSkillMarkdown(source.markdown, source.slug);
   return {
+    id: `example:${parsed.sourcePath}`,
     slug: parsed.slug,
     name: parsed.name,
     description: parsed.description,
     category: source.category,
     sourcePath: parsed.sourcePath,
     markdown: parsed.markdown,
-    relations: parsed.explicitRelations,
+    relations: parsed.explicitRelations.map((slug) => `example:skills/${slug}/SKILL.md`),
     tone: source.tone,
   };
 }
