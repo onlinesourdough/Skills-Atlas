@@ -1,5 +1,39 @@
 # Pre-Ship proof
 
+## UI/UX design study — source-delivery review
+
+2026-09-24: the owner authorized pushing the completed design study to the
+existing Atlas remote. This delta adds the separate
+[design snapshot](../design/atlas-uiux-study/README.md), a README route and this
+record. The application, dependencies, access policy and deployment workflow
+are unchanged. The Pages workflow remains manual; this is Git source delivery,
+not a deployment or approval of the open product release gates below.
+
+The snapshot is byte-identical to the study reviewed on 2026-09-13. Its
+[recorded hashes](../design/atlas-uiux-study/evidence/artifact-sha256.txt) pass,
+and a recursive comparison found no differences from the accepted task artifact.
+The 47 browser checks and screenshots in its review are historical evidence for
+those unchanged bytes, not a new browser run or production acceptance.
+
+Fresh checks passed: syntax for the three JavaScript entry files, repository
+documentation links, scoped formatting, repository ESLint, whitespace and a
+scoped text scan for known credentials, owner paths and the withheld revision.
+The relocated loopback server served six assets with exact-byte equality and
+passed HEAD, unsupported-method, missing-file and path-traversal checks. The
+temporary verification server was stopped afterwards.
+
+The exact archived snapshot and raw reference excerpts are excluded from the
+application formatter and linter to preserve their recorded bytes. Existing
+application checks remain unchanged; the snapshot has its own bounded review
+and fresh syntax, integrity and server checks. Reference excerpts retain their
+source attribution and do not claim a reuse licence. No real skill bodies,
+credentials, login or provider-write proof are introduced.
+
+Recovery is a normal revert of this single additive design-delivery commit,
+without resetting unrelated work. No database, configuration, account or
+deployed asset needs recovery. Product behavior and adoption remain outside
+this source-delivery acceptance.
+
 ## Repository graph Candidate 2 — independent local Review and delivery PASS
 
 2026-09-09: lead independently verified both test-only overlays and all 128

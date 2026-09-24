@@ -69,6 +69,23 @@ occurred. See [current evidence](docs/proof.md).
   screens use sequential list/reader navigation and a keyboard source drawer.
   The mobile drawer also provides the application source link on GitHub.
 
+## Separate UI/UX design study
+
+The [September 2026 design study](design/atlas-uiux-study/README.md) is a
+standalone, fictional-data prototype, not an application update. It includes
+the reference audit, HTML/CSS observations, onboarding and interaction examples,
+and the original bounded review evidence. Run it locally without installing
+dependencies:
+
+```sh
+node design/atlas-uiux-study/serve.mjs
+```
+
+Open the loopback address printed by the server. The study is not part of the
+application build or Pages deployment and makes no repository or account calls.
+Its snapshot is retained byte-for-byte; the original file hashes and review
+limitations are in [the review](design/atlas-uiux-study/REVIEW.md).
+
 ## Agent access
 
 The personal account's **Connect your agent** section gives this installation's

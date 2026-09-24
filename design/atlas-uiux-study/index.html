@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="An interactive, local design study for Online Sourdough Skill Atlas. Fictional data. No repository writes."
+    />
+    <title>Skill Atlas · Design study</title>
+    <link rel="icon" href="assets/atlas-icon.png" />
+    <link rel="stylesheet" href="atlas.css" />
+    <script src="data.js" defer></script>
+    <script src="atlas.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">Skip to workspace</a>
+    <div
+      id="boot"
+      class="boot"
+      role="status"
+      aria-label="Loading the example atlas"
+    >
+      <div class="atlas-orbit" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><span></span>
+      </div>
+      <h1>Your skills, connected.</h1>
+      <p>Opening the example atlas<span class="loading-dots">…</span></p>
+    </div>
+    <div id="app" class="app-shell" inert>
+      <header class="topbar">
+        <div class="brand">
+          <button
+            class="icon-button mobile-menu"
+            data-action="open-sources"
+            aria-label="Open sources and account"
+          ></button>
+          <img src="assets/atlas-icon.png" width="28" height="28" alt="" />
+          <span>Skill Atlas</span>
+        </div>
+        <nav class="view-tabs" aria-label="Main navigation">
+          <button data-view="graph" aria-current="page">Graph</button>
+          <button data-view="library">Library</button>
+          <button data-view="usage">Usage</button>
+        </nav>
+        <div class="header-right">
+          <span id="workspace-count" class="workspace-count"></span>
+          <button
+            id="search-trigger"
+            class="search-trigger"
+            data-action="search"
+            aria-label="Search all visible skills"
+            aria-haspopup="dialog"
+          >
+            <span class="search-icon"></span
+            ><span class="search-label">Search skills</span><kbd>⌘ K</kbd>
+          </button>
+          <button
+            class="preview-label"
+            data-action="about"
+            title="This is a design study with fictional data"
+          >
+            Design preview
+          </button>
+        </div>
+      </header>
+      <aside
+        id="sources-rail"
+        class="sources-rail"
+        aria-label="Sources and account"
+      >
+        <div class="rail-mobile-heading">
+          <strong>Your workspace</strong
+          ><button
+            class="icon-button"
+            data-action="close-sources"
+            aria-label="Close sources"
+          ></button>
+        </div>
+        <div class="rail-scroll">
+          <div class="rail-heading">
+            <h2>Sources</h2>
+            <button
+              class="icon-button"
+              data-action="manage-sources"
+              aria-label="Manage sources"
+            ></button>
+          </div>
+          <div id="source-list"></div>
+          <button class="add-source" data-action="add-source">
+            <span class="plus-icon"></span>Add a source
+          </button>
+          <div class="rail-divider"></div>
+          <div class="rail-heading"><h2>Explore</h2></div>
+          <button
+            class="rail-link"
+            data-action="all-skills"
+            title="Open the complete library and clear source filters"
+          >
+            <span class="grid-icon"></span><span>All skills</span
+            ><span id="all-count" class="count"></span>
+          </button>
+          <button class="rail-link" data-action="overlaps">
+            <span class="overlap-icon"></span><span>Possible overlaps</span
+            ><span id="overlap-count" class="count">2</span>
+          </button>
+          <div class="rail-note">
+            <span class="tiny-dot"></span>
+            <div>
+              Example workspace<small>No live repositories connected</small>
+            </div>
+          </div>
+        </div>
+        <div class="profile-dock">
+          <button
+            class="profile-trigger"
+            id="profile-trigger"
+            data-action="profile"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+          >
+            <span class="avatar">GA</span
+            ><span
+              ><strong>Gustav Anderson</strong
+              ><small>Personal workspace</small></span
+            ><span class="chevrons-icon"></span>
+          </button>
+        </div>
+      </aside>
+      <div class="drawer-scrim" id="drawer-scrim" hidden></div>
+      <main id="workspace" class="workspace" tabindex="-1">
+        <section
+          id="graph-view"
+          class="view graph-view"
+          aria-label="Skill graph"
+        >
+          <div class="graph-layout" id="graph-layout">
+            <div class="map-area" id="map-area">
+              <div class="map-heading">
+                <div>
+                  <span class="eyebrow">YOUR SKILL MAP</span>
+                  <p id="graph-description">
+                    One view of everything you work with.
+                  </p>
+                </div>
+                <button
+                  class="quiet-button map-list-button"
+                  data-action="graph-list"
+                >
+                  <span class="list-icon"></span>List
+                </button>
+              </div>
+              <svg
+                id="graph"
+                role="group"
+                aria-label="Interactive skill references. Use arrow keys to navigate and Enter to inspect. A list alternative is available."
+              ></svg>
+              <div id="graph-empty" class="graph-empty" hidden></div>
+              <div id="graph-tooltip" class="graph-tooltip" hidden></div>
+              <div class="map-bottom">
+                <div class="zoom-controls">
+                  <button data-action="zoom-out" aria-label="Zoom out">−</button
+                  ><button data-action="fit" title="Fit the visible sources">
+                    Fit</button
+                  ><button data-action="zoom-in" aria-label="Zoom in">+</button>
+                </div>
+                <span class="map-hint">Scroll to zoom · drag to explore</span
+                ><button class="map-agent" data-action="agent">
+                  <span class="agent-icon"></span>Connect your agent<span
+                    class="arrow-up-icon"
+                  ></span>
+                </button>
+              </div>
+            </div>
+            <aside
+              id="inspector"
+              class="inspector"
+              aria-label="Selected skill"
+              hidden
+            ></aside>
+          </div>
+        </section>
+        <section
+          id="library-view"
+          class="view library-view"
+          aria-label="Skill library"
+          hidden
+        >
+          <div class="library-index">
+            <div class="library-toolbar">
+              <div class="library-heading">
+                <h1>Library <span id="library-count"></span></h1>
+                <label class="sort-label"
+                  ><span class="sr-only">Sort skills</span
+                  ><select id="library-sort">
+                    <option value="name">A–Z</option>
+                    <option value="references">Most connected</option>
+                    <option value="source">By source</option>
+                  </select></label
+                >
+              </div>
+              <label class="library-filter"
+                ><span class="search-icon"></span
+                ><input
+                  id="library-filter"
+                  type="search"
+                  placeholder="Filter this library"
+                  aria-label="Filter the skill library"
+              /></label>
+            </div>
+            <div id="skill-list" class="skill-list"></div>
+          </div>
+          <div id="reader" class="reader"></div>
+        </section>
+        <section
+          id="usage-view"
+          class="view usage-view"
+          aria-label="Usage and library health"
+          hidden
+        ></section>
+      </main>
+    </div>
+    <dialog
+      id="search-dialog"
+      class="search-dialog"
+      aria-labelledby="search-title"
+    >
+      <h2 id="search-title" class="sr-only">Search skills</h2>
+      <div class="search-dialog-field">
+        <span class="search-icon"></span
+        ><input
+          id="global-search"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="search-results"
+          aria-expanded="true"
+          autocomplete="off"
+          placeholder="Find a skill, phrase, or file…"
+          aria-label="Search skills, descriptions, and files"
+        /><button
+          class="escape-key"
+          data-close="search-dialog"
+          aria-label="Close search"
+        >
+          Esc
+        </button>
+      </div>
+      <div class="search-scope" id="search-scope"></div>
+      <div
+        id="search-results"
+        role="listbox"
+        aria-label="Matching skills"
+      ></div>
+      <footer>
+        <span><kbd>↑</kbd><kbd>↓</kbd> navigate <kbd>↵</kbd> open</span
+        ><span>Only visible sources</span>
+      </footer>
+    </dialog>
+    <dialog
+      id="profile-dialog"
+      class="profile-dialog"
+      aria-labelledby="profile-title"
+    ></dialog>
+    <dialog
+      id="detail-dialog"
+      class="detail-dialog"
+      aria-labelledby="detail-title"
+    ></dialog>
+    <dialog
+      id="confirm-dialog"
+      class="confirm-dialog"
+      aria-labelledby="confirm-title"
+    ></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <noscript
+      >This local design study needs JavaScript for its graph and interactions.
+      It does not connect to external services.</noscript
+    >
+  </body>
+</html>

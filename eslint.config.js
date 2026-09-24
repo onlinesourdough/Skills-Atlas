@@ -4,7 +4,15 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "proof/**", ".wrangler/**", "worker/env.d.ts"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "proof/**",
+      ".wrangler/**",
+      "worker/env.d.ts",
+      // Standalone reviewed snapshot, not application source; see its REVIEW.md.
+      "design/atlas-uiux-study/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

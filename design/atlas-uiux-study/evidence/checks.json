@@ -1,0 +1,443 @@
+{
+  "date": "2026-09-13",
+  "target": "Separate local Skill Atlas design study",
+  "checks": [
+    {
+      "name": "Supporting Markdown opens",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Raw source preserves frontmatter",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Hidden selection cleared and counts agree",
+      "pass": true,
+      "details": "",
+      "observation": {
+        "all": "44",
+        "list": "35 / 44",
+        "reader": "A little context goes a long way.Choose a skill to read the complete instructions, inspect its files, and follow its references."
+      }
+    },
+    {
+      "name": "All skills restores all sources and rows",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Search finds body text beyond the title",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Search has useful zero-result state",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Keyboard result opens exact reader",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Draft preview treats HTML as inert",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Dirty draft interrupts navigation",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Proposal boundary stays explicit",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Empty draft blocked with real select-all/delete",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Malformed metadata is blocked",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Discard returns to unchanged source",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Default usage does not fabricate events",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Period changes labelled sample totals",
+      "pass": true,
+      "details": {
+        "days30": "2,377",
+        "days7": "557"
+      }
+    },
+    {
+      "name": "Onboarding cannot continue with no sources",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Onboarding completes at a useful first skill",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Empty import explains the required format",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Duplicate source is rejected",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Import preview is separate from confirmation",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Confirmed example joins all views",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Denied access has recovery without assuming login",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Mobile reader is full-width, with no horizontal clipping",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Mobile drawer makes background inert",
+      "pass": true,
+      "details": "Read DOM attributes because this browser inspection adapter does not expose the inert property."
+    },
+    {
+      "name": "Drawer traps reverse Tab at the profile",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Drawer wraps Tab back to close",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Escape closes drawer and restores trigger",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Mobile usage keeps skill names available",
+      "pass": true,
+      "details": "Retest measures the available name column, not the natural width of a short title."
+    },
+    {
+      "name": "Mobile onboarding exits the drawer into a usable reader",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Reader tabs support arrow-key navigation",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Mobile editor keeps input and footer usable",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Tablet reader remains sequential and full width",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Hover shows context without moving the camera",
+      "pass": true,
+      "details": {
+        "before": "translate(67.78320753008666 69.65502718775804) scale(0.9439379093061135)"
+      },
+      "observation": {
+        "camera": "translate(67.78320753008666 69.65502718775804) scale(0.9439379093061135)",
+        "hidden": false,
+        "tooltip": "ClarifyGlobal Skills · 3 visible references"
+      }
+    },
+    {
+      "name": "Zoom changes the graph camera",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Graph arrow key moves semantic node focus",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Enter opens focused node inspector",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Reduced motion suppresses CSS transitions and loader motion",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Search Escape restores its trigger",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "All hidden sources produce a recoverable empty state",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Empty graph recovery restores all nodes",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Most connected sorting is descending",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Representative solid text contrast",
+      "pass": true,
+      "details": {
+        "minimum": 4.57,
+        "samples": 14
+      }
+    },
+    {
+      "name": "Final node selection focuses the inspector heading",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Graph–reader round trip preserves selection and camera",
+      "pass": true,
+      "details": {
+        "expectedSkill": "Clarify",
+        "expectedCamera": "translate(-155.53242579868265 215.03115252143812) scale(1.1752026612417665)"
+      },
+      "observation": {
+        "camera": "translate(-155.53242579868265 215.03115252143812) scale(1.1752026612417665)",
+        "selected": "Clarify"
+      }
+    },
+    {
+      "name": "Diff opens around the first changed lines",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "Final solid text contrast including hover surfaces",
+      "pass": true,
+      "details": {
+        "minimum": 4.62,
+        "samples": 16
+      }
+    },
+    {
+      "name": "Drag pans the graph",
+      "pass": true,
+      "details": ""
+    }
+  ],
+  "passed": 47,
+  "contrast": [
+    {
+      "background": "rgb(247, 243, 235)",
+      "color": "rgb(48, 37, 30)",
+      "opacity": "1",
+      "selector": ".source-row strong",
+      "size": "12px",
+      "theme": "light",
+      "ratio": 13.47
+    },
+    {
+      "background": "rgb(247, 243, 235)",
+      "color": "rgb(113, 102, 91)",
+      "opacity": "1",
+      "selector": ".source-row small",
+      "size": "10px",
+      "theme": "light",
+      "ratio": 5.05
+    },
+    {
+      "background": "rgb(255, 253, 247)",
+      "color": "rgb(113, 102, 91)",
+      "opacity": "1",
+      "selector": ".map-heading p",
+      "size": "12px",
+      "theme": "light",
+      "ratio": 5.5
+    },
+    {
+      "background": "rgb(255, 254, 250)",
+      "color": "rgb(48, 37, 30)",
+      "opacity": "1",
+      "selector": ".view-tabs button[aria-current]",
+      "size": "12px",
+      "theme": "light",
+      "ratio": 14.77
+    },
+    {
+      "background": "rgb(247, 243, 235)",
+      "color": "rgb(48, 37, 30)",
+      "opacity": "1",
+      "selector": ".profile-trigger strong",
+      "size": "11.5px",
+      "theme": "light",
+      "ratio": 13.47
+    },
+    {
+      "background": "rgb(247, 243, 235)",
+      "color": "rgb(113, 102, 91)",
+      "opacity": "1",
+      "selector": ".profile-trigger small",
+      "size": "10px",
+      "theme": "light",
+      "ratio": 5.05
+    },
+    {
+      "background": "rgb(247, 243, 235)",
+      "color": "rgb(150, 96, 32)",
+      "opacity": "1",
+      "selector": ".preview-label",
+      "size": "10px",
+      "theme": "light",
+      "ratio": 4.75
+    },
+    {
+      "background": "rgb(33, 31, 27)",
+      "color": "rgb(242, 237, 226)",
+      "opacity": "1",
+      "selector": ".source-row strong",
+      "size": "12px",
+      "theme": "dark",
+      "ratio": 14.09
+    },
+    {
+      "background": "rgb(33, 31, 27)",
+      "color": "rgb(174, 165, 150)",
+      "opacity": "1",
+      "selector": ".source-row small",
+      "size": "10px",
+      "theme": "dark",
+      "ratio": 6.75
+    },
+    {
+      "background": "rgb(37, 35, 31)",
+      "color": "rgb(174, 165, 150)",
+      "opacity": "1",
+      "selector": ".map-heading p",
+      "size": "12px",
+      "theme": "dark",
+      "ratio": 6.44
+    },
+    {
+      "background": "rgb(46, 43, 37)",
+      "color": "rgb(242, 237, 226)",
+      "opacity": "1",
+      "selector": ".view-tabs button[aria-current]",
+      "size": "12px",
+      "theme": "dark",
+      "ratio": 12.08
+    },
+    {
+      "background": "rgb(33, 31, 27)",
+      "color": "rgb(242, 237, 226)",
+      "opacity": "1",
+      "selector": ".profile-trigger strong",
+      "size": "11.5px",
+      "theme": "dark",
+      "ratio": 14.09
+    },
+    {
+      "background": "rgb(33, 31, 27)",
+      "color": "rgb(174, 165, 150)",
+      "opacity": "1",
+      "selector": ".profile-trigger small",
+      "size": "10px",
+      "theme": "dark",
+      "ratio": 6.75
+    },
+    {
+      "background": "rgb(33, 31, 27)",
+      "color": "rgb(235, 189, 124)",
+      "opacity": "1",
+      "selector": ".preview-label",
+      "size": "10px",
+      "theme": "dark",
+      "ratio": 9.48
+    },
+    {
+      "selector": "secondary text on hover",
+      "color": "rgb(113, 102, 91)",
+      "background": "rgb(238, 233, 223)",
+      "size": "10px",
+      "opacity": "1",
+      "theme": "light",
+      "ratio": 4.62
+    },
+    {
+      "selector": "secondary text on well",
+      "color": "rgb(113, 102, 91)",
+      "background": "rgb(240, 236, 227)",
+      "size": "10px",
+      "opacity": "1",
+      "theme": "light",
+      "ratio": 4.75
+    }
+  ],
+  "viewportCss": [
+    {
+      "width": 1441,
+      "height": 900
+    },
+    {
+      "width": 819,
+      "height": 900
+    },
+    {
+      "width": 391,
+      "height": 844
+    },
+    {
+      "width": 375,
+      "height": 711
+    }
+  ],
+  "limitations": [
+    "Same-agent review, not independent acceptance.",
+    "UI-only fictional data; no live authentication, repository writes, tracking, MCP, or provider tests.",
+    "Browser inspection adapter ignores fill(\"\") on the textarea; empty-input validation was verified through select-all and Backspace instead.",
+    "The adapter does not expose element.inert; the same state was verified through its DOM attribute and actual focus navigation.",
+    "Viewport override is affected by 0.64 page zoom and a minimum width. Actual CSS dimensions were read back; 320px was not verified.",
+    "Background browser screenshots can retain transitional compositor frames. Final desktop overview, inspector, profile and usage screenshots were captured with reduced motion for their static end states; the media override is reset before handback.",
+    "Clipboard and file-download side effects, native browser Back/Forward, physical touch, full screen reader coverage, all text/graphic contrast states, and a complete CommonMark implementation are outside this verification."
+  ]
+}

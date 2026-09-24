@@ -4,3 +4,5 @@ node_modules/
 proof/
 .wrangler/
 worker/env.d.ts
+# Reviewed design snapshot and raw reference excerpts; preserve recorded hashes.
+design/atlas-uiux-study/
