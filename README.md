@@ -1,8 +1,4 @@
-![Online Sourdough Skills Atlas](assets/branding/atlas-banner.png)
-
-<a href="assets/branding/atlas-icon.png"><img src="assets/branding/atlas-icon.png" alt="Skills Atlas icon" width="32" height="32" /></a>
-
-# Skill Atlas
+# Skills Atlas
 
 Skill Atlas helps teammates explore Git-backed skills through a graph,
 searchable library and complete Markdown reader. GitHub stays canonical.
@@ -19,25 +15,10 @@ choices belong to your numeric GitHub profile; skill bodies stay in GitHub.
 Hosted policy requires active onlinesourdough membership. Self-host operators
 choose an organization or numeric-user allowlist.
 
-Phases A–E retain independent local acceptance. F-local integrated/recovery
-and G-local UI/UX received independent lead PASS on 2026-09-08, including
-fresh exact-source reproduction, all three synthetic browser suites and
-33-frame visual review. C-live, D-native, G-native zoom and overall H remain
-OPEN. Local evidence does not establish live GitHub installation/private access,
-real Codex connection, native Codex zoom or Ship. See [proof](docs/proof.md).
-
-On 2026-09-09 the lead reported successful real personal login and six imports.
-The resulting repository-graph Candidate 2 received independent local browser,
-visual and architecture Review PASS. Lead verified local health and served assets
-at port 8787. On 2026-09-09, lead real personal-session UI smoke and visual I1–I5
-passed after manual unlock: six sources, 44 skills, 40 references, distinct labelled
-groups, weak-match overlap inspection, complete reader and selected-neighborhood
-return. Zero resolved cross-repository references does not establish absence of
-relationships; exact revision/file matching still applies. At the user's request,
-standalone feature development stops at this verified local checkpoint; further
-work requires a new explicit scope. The sharp development dependency,
-private/native and full H gates remain open; no production deployment or migration
-occurred. See [current evidence](docs/proof.md).
+**Status:** local development and personal-session checks have been completed.
+Production deployment, full private-access acceptance and native agent integration
+remain incomplete. Development is paused at the verified local checkpoint; see
+[proof and remaining work](docs/proof.md).
 
 ## Browsing and sources
 
