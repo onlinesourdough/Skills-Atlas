@@ -1,10 +1,16 @@
-# Skills Atlas
+# Skills Atlas — archive
+
+**Archived on 1 October 2026.** This standalone application is no longer
+maintained. Shared skills, their index and native discovery are maintained in
+[AIOS](https://github.com/onlinesourdough/AIOS-Plugin). The Atlas application and
+its historical implementation/proof remain here; its graph and hosting features
+have not been merged into AIOS.
 
 Skill Atlas helps teammates explore Git-backed skills through a graph,
 searchable library and complete Markdown reader. GitHub stays canonical.
 
-- Release target: [skills.onlinesourdough.com](https://skills.onlinesourdough.com)
-- Default skills source: [onlinesourdough/Global-Skills](https://github.com/onlinesourdough/Global-Skills)
+- Former release target: [skills.onlinesourdough.com](https://skills.onlinesourdough.com)
+- Original skills source (also archived): [onlinesourdough/Global-Skills](https://github.com/onlinesourdough/Global-Skills)
 - Application source: [onlinesourdough/Skills-Atlas](https://github.com/onlinesourdough/Skills-Atlas)
 - [Issues](https://github.com/onlinesourdough/Skills-Atlas/issues) · [MIT license](LICENSE)
 
@@ -15,9 +21,9 @@ choices belong to your numeric GitHub profile; skill bodies stay in GitHub.
 Hosted policy requires active onlinesourdough membership. Self-host operators
 choose an organization or numeric-user allowlist.
 
-**Status:** local development and personal-session checks have been completed.
+**Status at archival:** local development and personal-session checks have been completed.
 Production deployment, full private-access acceptance and native agent integration
-remain incomplete. Development is paused at the verified local checkpoint; see
+remain incomplete. The last verified local checkpoint is preserved; see
 [proof and remaining work](docs/proof.md).
 
 ## Browsing and sources
